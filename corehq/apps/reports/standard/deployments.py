@@ -12,6 +12,8 @@ from django.utils.translation import ugettext_noop, ugettext as _, ugettext_lazy
 from couchdbkit import ResourceNotFound
 from corehq.apps.es.aggregations import DateHistogram
 from corehq.apps.hqwebapp.decorators import use_nvd3
+from corehq.apps.hqwebapp.doc_info import get_doc_info
+from corehq.apps.hqwebapp.templatetags.hq_shared_tags import pretty_doc_info
 from corehq.apps.users.models import DeviceIdLastUsed
 from couchexport.export import SCALAR_NEVER_WAS
 
@@ -199,10 +201,9 @@ class ApplicationStatusReport(GetParamsMixin, PaginatedReportMixin, DeploymentsR
                 if app_meta.app_id:
                     app_name = self.get_app_name(app_meta.app_id)
 
+            user_doc_info = get_doc_info(user)
             rows.append([
-                user_display_string(user.get('username', ''),
-                                    user.get('first_name', ''),
-                                    user.get('last_name', '')),
+                pretty_doc_info(user_doc_info),
                 _fmt_date(last_seen, fmt_for_export),
                 _fmt_date(last_submission, fmt_for_export),
                 _fmt_date(last_sync, fmt_for_export),
