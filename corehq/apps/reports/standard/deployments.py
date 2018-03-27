@@ -459,8 +459,8 @@ class AggregateUserStatusReport(ProjectReport, ProjectReportParametersMixin):
         )
         user_query = user_query.size(0)
         user_query = user_query.aggregations([
-            DateHistogram('last_submission', 'reporting_metadata.last_submission_for_user.submission_date', '1d'),
-            DateHistogram('last_sync', 'reporting_metadata.last_sync_for_user.sync_date', '1d')
+            DateHistogram('last_submission', 'last_device.app_meta.last_submission"', '1d'),
+            DateHistogram('last_sync', 'last_device.app_meta.last_sync"', '1d')
         ])
         return user_query
 
