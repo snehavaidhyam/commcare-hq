@@ -872,6 +872,12 @@ class DeviceIdLastUsed(DocumentSchema):
     def get_meta_for_app(self, app_id):
         return filter_by_app(self.app_meta, app_id)
 
+    def get_latest_app(self):
+        try:
+            return max(self.app_meta, key=lambda a: a.last_request)
+        except ValueError:
+            pass
+
     def __eq__(self, other):
         return all(getattr(self, p) == getattr(other, p) for p in self.properties())
 

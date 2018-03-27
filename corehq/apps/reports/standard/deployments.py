@@ -12,6 +12,7 @@ from django.utils.translation import ugettext_noop, ugettext as _, ugettext_lazy
 from couchdbkit import ResourceNotFound
 from corehq.apps.es.aggregations import DateHistogram
 from corehq.apps.hqwebapp.decorators import use_nvd3
+from corehq.apps.users.models import DeviceIdLastUsed
 from couchexport.export import SCALAR_NEVER_WAS
 
 from corehq.apps.reports.filters.users import ExpandedMobileWorkerFilter
@@ -61,23 +62,18 @@ class ApplicationStatusReport(GetParamsMixin, PaginatedReportMixin, DeploymentsR
     def headers(self):
         headers = DataTablesHeader(
             DataTablesColumn(_("Username"), prop_name='username.exact'),
-            DataTablesColumn(_("Last Submission"),
-                             prop_name='reporting_metadata.last_submissions.submission_date',
-                             alt_prop_name='reporting_metadata.last_submission_for_user.submission_date'),
-            DataTablesColumn(_("Last Sync"),
-                             prop_name='reporting_metadata.last_syncs.sync_date',
-                             alt_prop_name='reporting_metadata.last_sync_for_user.sync_date'),
+            DataTablesColumn(_("Last Seen"), prop_name='devices.last_used'),
+            DataTablesColumn(_("Last Submission"), sortable=False),
+            DataTablesColumn(_("Last Sync"), sortable=False),
             DataTablesColumn(_("Application"),
                              help_text=_("The name of the application from the user's last request."),
                              sortable=False),
             DataTablesColumn(_("Application Version"),
                              help_text=_("The application version from the user's last request."),
-                             prop_name='reporting_metadata.last_builds.build_version',
-                             alt_prop_name='reporting_metadata.last_build_for_user.build_version'),
+                             prop_name='devices.app_meta.build_version'),
             DataTablesColumn(_("CommCare Version"),
                              help_text=_("""The CommCare version from the user's last request"""),
-                             prop_name='reporting_metadata.last_submissions.commcare_version',
-                             alt_prop_name='reporting_metadata.last_submission_for_user.commcare_version'),
+                             prop_name='devices.commcare_version'),
         )
         headers.custom_sort = [[1, 'desc']]
         return headers
@@ -85,7 +81,7 @@ class ApplicationStatusReport(GetParamsMixin, PaginatedReportMixin, DeploymentsR
     @property
     def default_sort(self):
         if self.selected_app_id:
-            self.primary_sort_prop = 'reporting_metadata.last_submissions.submission_date'
+            self.primary_sort_prop = 'devices.last_used'
             return {
                 self.primary_sort_prop: {
                     'order': 'desc',
@@ -97,21 +93,12 @@ class ApplicationStatusReport(GetParamsMixin, PaginatedReportMixin, DeploymentsR
                 }
             }
         else:
-            self.primary_sort_prop = 'reporting_metadata.last_submission_for_user.submission_date'
-            return {'reporting_metadata.last_submission_for_user.submission_date': 'desc'}
-
-    @property
-    def sort_base(self):
-        return '.'.join(self.primary_sort_prop.split('.')[:2])
-
-    @property
-    def sort_filter(self):
-        return self.sort_base + '.app_id'
+            self.primary_sort_prop = 'devices.last_used'
+            return {'devices.last_used': 'desc'}
 
     def get_sorting_block(self):
-        sort_prop_name = 'prop_name' if self.selected_app_id else 'alt_prop_name'
         res = []
-        #the NUMBER of cols sorting
+        # the NUMBER of cols sorting
         sort_cols = int(self.request.GET.get('iSortingCols', 0))
         if sort_cols > 0:
             for x in range(sort_cols):
@@ -119,22 +106,21 @@ class ApplicationStatusReport(GetParamsMixin, PaginatedReportMixin, DeploymentsR
                 sort_dir = self.request.GET['sSortDir_%d' % x]
                 col_id = int(self.request.GET[col_key])
                 col = self.headers.header[col_id]
-                sort_prop = getattr(col, sort_prop_name) or col.prop_name
                 if x == 0:
-                    self.primary_sort_prop = sort_prop
+                    self.primary_sort_prop = col.prop_name
                 if self.selected_app_id:
                     sort_dict = {
-                        sort_prop: {
+                        col.prop_name: {
                             "order": sort_dir,
                             "nested_filter": {
                                 "term": {
-                                    self.sort_filter: self.selected_app_id
+                                    'devices.app_meta.app_id': self.selected_app_id
                                 }
                             }
                         }
                     }
                 else:
-                    sort_dict = {sort_prop: sort_dir}
+                    sort_dict = {col.prop_name: sort_dir}
                 res.append(sort_dict)
         if len(res) == 0 and self.default_sort is not None:
             res.append(self.default_sort)
@@ -182,55 +168,47 @@ class ApplicationStatusReport(GetParamsMixin, PaginatedReportMixin, DeploymentsR
                           .start(self.pagination.start))
         if self.selected_app_id:
             user_query = user_query.nested(
-                self.sort_base,
-                filters.term(self.sort_filter, self.selected_app_id)
+                'devices.app_meta',
+                filters.term('devices.app_meta.app_id', self.selected_app_id)
             )
         return user_query
 
     def process_rows(self, users, fmt_for_export=False):
         rows = []
         for user in users:
-            last_build = last_seen = last_sub = last_sync = last_sync_date = app_name = commcare_version = None
+            last_seen = last_submission = last_sync = app_name = None
             build_version = _("Unknown")
-            reporting_metadata = user.get('reporting_metadata', {})
+            try:
+                most_recent_device_doc = max(user.get('devices', []), key=lambda dev: dev['last_used'])
+            except ValueError:
+                continue
+
+            most_recent_device = DeviceIdLastUsed.wrap(most_recent_device_doc)
+            last_seen = most_recent_device.last_used
+            commcare_version = _get_commcare_version(most_recent_device.commcare_version)
+
             if self.selected_app_id:
-                last_submissions = reporting_metadata.get('last_submissions')
-                if last_submissions:
-                    last_sub = self.get_data_for_app(last_submissions, self.selected_app_id)
-                last_syncs = reporting_metadata.get('last_syncs')
-                if last_syncs:
-                    last_sync = self.get_data_for_app(last_syncs, self.selected_app_id)
-                    if last_sync is None:
-                        last_sync = self.get_data_for_app(last_syncs, None)
-                last_builds = reporting_metadata.get('last_builds')
-                if last_builds:
-                    last_build = self.get_data_for_app(last_builds, self.selected_app_id)
+                app_meta = most_recent_device.get_meta_for_app(self.selected_app_id)
             else:
-                last_sub = reporting_metadata.get('last_submission_for_user', {})
-                last_sync = reporting_metadata.get('last_sync_for_user', {})
-                last_build = reporting_metadata.get('last_build_for_user', {})
-            if last_sub and last_sub.get('commcare_version'):
-                commcare_version = _get_commcare_version(last_sub.get('commcare_version'))
-            else:
-                devices = user.get('devices', None)
-                if devices:
-                    device = max(devices, key=lambda dev: dev['last_used'])
-                    if device.get('commcare_version', None):
-                        commcare_version = _get_commcare_version(device['commcare_version'])
-            if last_sub and last_sub.get('submission_date'):
-                last_seen = string_to_utc_datetime(last_sub['submission_date'])
-            if last_sync and last_sync.get('sync_date'):
-                last_sync_date = string_to_utc_datetime(last_sync['sync_date'])
-            if last_build:
-                build_version = last_build.get('build_version') or build_version
-                if last_build.get('app_id'):
-                    app_name = self.get_app_name(last_build['app_id'])
+                app_meta = most_recent_device.get_latest_app()
+
+            if app_meta:
+                last_submission = app_meta.last_submission
+                last_sync = app_meta.last_sync
+                build_version = app_meta.build_version or build_version
+                if app_meta.app_id:
+                    app_name = self.get_app_name(app_meta.app_id)
+
             rows.append([
                 user_display_string(user.get('username', ''),
                                     user.get('first_name', ''),
                                     user.get('last_name', '')),
-                _fmt_date(last_seen, fmt_for_export), _fmt_date(last_sync_date, fmt_for_export),
-                app_name or "---", build_version, commcare_version or '---'
+                _fmt_date(last_seen, fmt_for_export),
+                _fmt_date(last_submission, fmt_for_export),
+                _fmt_date(last_sync, fmt_for_export),
+                app_name or "---",
+                build_version,
+                commcare_version or '---'
             ])
         return rows
 
