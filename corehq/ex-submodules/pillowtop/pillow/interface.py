@@ -272,14 +272,18 @@ def handle_pillow_error(pillow, change, exception):
 
     # always retry document missing errors, because the error is likely with couch
     if pillow.retry_errors or isinstance(exception, DocumentMissingError):
-        try:
-            error = PillowError.get_or_create(change, pillow)
-        except (DatabaseError, InterfaceError) as e:
-            error_id = 'PillowError.get_or_create failed'
+        from corehq.apps.change_feed.producer import producer
+
+        change.record_error(exception, sys.exc_info()[2])
+        if change.should_retry():
+            producer.send_change(change.topic, change.metadata)
         else:
-            error.add_attempt(exception, sys.exc_info()[2])
-            error.save()
-            error_id = error.id
+            try:
+                error = PillowError.get_or_create(change.metadata, pillow)
+            except (DatabaseError, InterfaceError) as e:
+                error_id = 'PillowError.get_or_create failed'
+            else:
+                error_id = error.id
 
     pillow_logging.exception(
         "[%s] Error on change: %s, %s. Logged as: %s" % (

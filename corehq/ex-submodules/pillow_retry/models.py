@@ -35,17 +35,14 @@ class PillowError(models.Model):
     pillow = models.CharField(max_length=255, null=False, db_index=True)
     date_created = models.DateTimeField()
     date_last_attempt = models.DateTimeField()
-    date_next_attempt = models.DateTimeField(db_index=True, null=True)
     total_attempts = models.IntegerField(default=0)
-    current_attempt = models.IntegerField(default=0, db_index=True)
     error_type = models.CharField(max_length=255, null=True, db_index=True)
     error_traceback = models.TextField(null=True)
-    change = JSONField(null=True)
     change_metadata = JSONField(null=True)
 
     @property
     def change_object(self):
-        change = change_from_couch_row(self.change if self.change else {'id': self.doc_id})
+        change = change_from_couch_row({'id': self.doc_id})
         if self.change_metadata:
             change.metadata = ChangeMeta.wrap(self.change_metadata)
         change.document = None
@@ -55,34 +52,9 @@ class PillowError(models.Model):
         app_label = 'pillow_retry'
         unique_together = ('doc_id', 'pillow',)
 
-    def add_attempt(self, exception, traceb, date=None):
-        self.current_attempt += 1
-        self.total_attempts += 1
-        self.date_last_attempt = date or datetime.utcnow()
-        self.error_type = path_from_object(exception)
-
-        self.error_traceback = "{}\n\n{}".format(exception.message, "".join(traceback.format_tb(traceb)))
-
-        if self.current_attempt <= settings.PILLOW_RETRY_QUEUE_MAX_PROCESSING_ATTEMPTS:
-            time_till_next = settings.PILLOW_RETRY_REPROCESS_INTERVAL * math.pow(self.current_attempt, settings.PILLOW_RETRY_BACKOFF_FACTOR)
-            self.date_next_attempt = self.date_last_attempt + timedelta(minutes=time_till_next)
-        else:
-            self.date_next_attempt = None
-
-    def reset_attempts(self):
-        self.current_attempt = 0
-        self.date_next_attempt = datetime.utcnow()
-
-    def has_next_attempt(self):
-        return self.current_attempt == 0 or (
-            self.total_attempts <= self.multi_attempts_cutoff() and
-            self.current_attempt <= settings.PILLOW_RETRY_QUEUE_MAX_PROCESSING_ATTEMPTS
-        )
-
     @classmethod
-    def get_or_create(cls, change, pillow):
-        change.document = None
-        doc_id = change.id
+    def get_or_create(cls, change_metadata, pillow):
+        doc_id = change_metadata.document_id
         try:
             error = cls.objects.get(doc_id=doc_id, pillow=pillow.pillow_id)
         except cls.DoesNotExist:
@@ -91,13 +63,12 @@ class PillowError(models.Model):
                 doc_id=doc_id,
                 pillow=pillow.pillow_id,
                 date_created=now,
-                date_last_attempt=now,
-                date_next_attempt=now,
-                change=change.to_dict()
+                date_last_attempt=change_metadata.date_last_attempt,
+                total_attempts=change_metadata.attempts,
+                error_type=change_metadata.last_error_type,
+                error_traceback=change_metadata.last_error_traceback,
+                change_metadata=change_metadata.to_json(),
             )
-
-            if change.metadata:
-                error.change_metadata = change.metadata.to_json()
 
         return error
 
