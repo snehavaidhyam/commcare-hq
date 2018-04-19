@@ -34,6 +34,7 @@ class PillowError(models.Model):
     total_attempts = models.IntegerField(default=0)
     error_type = models.CharField(max_length=255, null=True, db_index=True)
     error_traceback = models.TextField(null=True)
+    change = JSONField(null=True)
     change_metadata = JSONField(null=True)
 
     @property
@@ -49,10 +50,11 @@ class PillowError(models.Model):
             )
             document_store = document_store
 
+        change_dict = self.change or {}
         return Change(
             id=self.doc_id,
-            sequence_id=None,
-            deleted=change_meta.is_deletion if change_meta else False,
+            sequence_id=change_dict.get('seq'),
+            deleted=change_dict.get('deleted'),
             document_store=document_store,
             metadata=change_meta
         )
@@ -62,23 +64,26 @@ class PillowError(models.Model):
         unique_together = ('doc_id', 'pillow',)
 
     @classmethod
-    def get_or_create(cls, change_metadata, pillow):
-        doc_id = change_metadata.document_id
+    def get_or_create(cls, change, pillow):
+        change.document = None
+        doc_id = change.id
         try:
             error = cls.objects.get(doc_id=doc_id, pillow=pillow.pillow_id)
         except cls.DoesNotExist:
-            now = datetime.utcnow()
             error = PillowError(
                 doc_id=doc_id,
                 pillow=pillow.pillow_id,
-                date_created=now,
-                date_last_attempt=change_metadata.date_last_attempt,
-                total_attempts=change_metadata.attempts,
-                error_type=change_metadata.last_error_type,
-                error_traceback=change_metadata.last_error_traceback,
-                change_metadata=change_metadata.to_json(),
+                date_created=datetime.utcnow(),
+                change=change.to_dict()
             )
 
+        error.date_last_attempt = change.metadata.date_last_attempt
+        error.total_attempts = change.metadata.attempts
+        error.error_type = change.metadata.last_error_type
+        error.error_traceback = change.metadata.last_error_traceback
+        error.change_metadata = change.metadata.to_json()
+
+        error.save()
         return error
 
     @classmethod

@@ -52,7 +52,7 @@ class GetDocProcessor(PillowProcessor):
 
 def create_error(change, message='message', attempts=0, pillow=None, ex_class=None):
     change.metadata = ChangeMeta(data_source_type='couch', data_source_name='test_commcarehq', document_id=change.id)
-    return PillowError.get_or_create(change.metadata, pillow or FakePillow())
+    return PillowError.get_or_create(change, pillow or FakePillow())
 
 
 class PillowRetryTestCase(TestCase):
@@ -114,7 +114,7 @@ class PillowRetryTestCase(TestCase):
 
     def test_empty_metadata(self):
         change = _change(id='123')
-        error = PillowError.get_or_create(change.metadata, GetDocPillow())
+        error = PillowError.get_or_create(change, GetDocPillow())
         error.save()
 
         # process_pillow_retry(error.id) TODO

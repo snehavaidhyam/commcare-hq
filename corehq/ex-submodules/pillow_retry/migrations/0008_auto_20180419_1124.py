@@ -14,10 +14,6 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RemoveField(
             model_name='pillowerror',
-            name='change',
-        ),
-        migrations.RemoveField(
-            model_name='pillowerror',
             name='current_attempt',
         ),
         migrations.RemoveField(

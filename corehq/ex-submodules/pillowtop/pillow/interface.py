@@ -279,7 +279,7 @@ def handle_pillow_error(pillow, change, exception):
             producer.send_change(change.topic, change.metadata)
         else:
             try:
-                error = PillowError.get_or_create(change.metadata, pillow)
+                error = PillowError.get_or_create(change, pillow)
             except (DatabaseError, InterfaceError) as e:
                 error_id = 'PillowError.get_or_create failed'
             else:
