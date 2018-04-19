@@ -107,7 +107,8 @@ class IndicatorDocument(six.with_metaclass(IndicatorDocumentMeta, schema.Documen
         """if set, this will use a kafka feed instead of couch for the pillow"""
         from corehq.apps.change_feed.data_sources import COUCH
         from corehq.apps.change_feed.topics import get_topic_for_doc_type
-        return get_topic_for_doc_type(self.document_class().to_json(), data_source_type=COUCH)
+        doc_type = self.document_class().to_json()['doc_type']
+        return get_topic_for_doc_type(doc_type, data_source_type=COUCH)
 
     @property
     def wrapped_group_by(self):
