@@ -499,6 +499,7 @@ class AllHmisCaseFluff(BaseM4ChangeCaseFluff):
 
 
 def M4ChangeFormFluffPillow(delete_filtered=False):
+    doc_type = XFormInstance().to_json()['doc_type']
     return get_multi_fluff_pillow(
         indicator_classes=[
             AncHmisCaseFluff,
@@ -509,7 +510,7 @@ def M4ChangeFormFluffPillow(delete_filtered=False):
             AllHmisCaseFluff,
         ],
         name='M4ChangeFormFluff',
-        kafka_topic=get_topic_for_doc_type(XFormInstance().to_json(), data_sources.COUCH),
+        kafka_topic=get_topic_for_doc_type(doc_type, data_sources.COUCH),
         delete_filtered=delete_filtered
     )
 
