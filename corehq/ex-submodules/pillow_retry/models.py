@@ -1,16 +1,12 @@
 from __future__ import absolute_import
-import json
-import traceback
-from datetime import datetime, timedelta
-from dateutil.parser import parse
-from django.conf import settings
-import math
+
+from datetime import datetime
+
 from django.db import models
 from django.db.models.aggregates import Count
 from jsonfield.fields import JSONField
 
-from pillowtop.feed.couch import change_from_couch_row
-from pillowtop.feed.interface import ChangeMeta
+from pillowtop.feed.interface import ChangeMeta, Change
 
 ERROR_MESSAGE_LENGTH = 512
 
@@ -42,11 +38,24 @@ class PillowError(models.Model):
 
     @property
     def change_object(self):
-        change = change_from_couch_row({'id': self.doc_id})
+        from corehq.apps.change_feed.data_sources import get_document_store
+        change_meta = document_store = None
         if self.change_metadata:
-            change.metadata = ChangeMeta.wrap(self.change_metadata)
-        change.document = None
-        return change
+            change_meta = ChangeMeta.wrap(self.change_metadata)
+            document_store = get_document_store(
+                data_source_type=change_meta.data_source_type,
+                data_source_name=change_meta.data_source_name,
+                domain=change_meta.domain
+            )
+            document_store = document_store
+
+        return Change(
+            id=self.doc_id,
+            sequence_id=None,
+            deleted=change_meta.is_deletion if change_meta else False,
+            document_store=document_store,
+            metadata=change_meta
+        )
 
     class Meta(object):
         app_label = 'pillow_retry'
