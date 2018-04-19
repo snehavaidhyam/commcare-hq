@@ -51,8 +51,11 @@ class GetDocProcessor(PillowProcessor):
             raise Exception('missing doc')
 
 
-def create_error(change, message='message', attempts=0, pillow=None, ex_class=None):
-    change.metadata = ChangeMeta(data_source_type='couch', data_source_name='test_commcarehq', document_id=change.id)
+def create_error(change, pillow=None, message=None):
+    change.metadata = ChangeMeta(
+        data_source_type='couch', data_source_name='test_commcarehq', document_id=change.id,
+        date_last_attempt=datetime.utcnow()
+    )
     return PillowError.get_or_create(change, pillow or FakePillow())
 
 
@@ -83,7 +86,7 @@ class PillowRetryTestCase(TestCase):
     def test_get_or_create(self):
         message = 'abcd'
         id = '12335'
-        error = create_error(_change(id=id), message=message, attempts=2)
+        error = create_error(_change(id=id), message=message)
         error.save()
 
         get = PillowError.get_or_create(_change(id=id), FakePillow())
