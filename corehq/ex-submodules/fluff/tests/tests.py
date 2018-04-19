@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 from django.conf import settings
 from django.test import TestCase
 
+from casexml.apps.case.models import CommCareCase
 from corehq.sql_db.connections import connection_manager
 from pillowtop.feed.couch import change_from_couch_row
 
@@ -95,7 +96,7 @@ class FluffTest(TestCase):
         self.fakedb = FakeCouchDb()
         MockIndicators.set_db(self.fakedb)
         MockIndicatorsWithGetters.set_db(self.fakedb)
-        MockDoc.set_db(self.fakedb)
+        CommCareCase.set_db(self.fakedb)
 
         MockIndicatorsSql.set_db(self.fakedb)
         rebuild_table(self.engine, None, MockIndicatorsSql)
@@ -160,13 +161,16 @@ class FluffTest(TestCase):
         self.assertEquals(list(Indicators2._calculators), ['base1', 'base2'])
 
     def test_indicator_calculation(self):
-        actions = [dict(date="2012-09-23", x=2), dict(date="2012-09-24", x=3)]
+        actions = [
+            dict(date="2012-09-23T00:00:00.000000Z", x=2),
+            dict(date="2012-09-24T00:00:00.000000Z", x=3)
+        ]
         doc = dict(
             actions=actions,
-            get_id="123",
+            _id="123",
             domain="mock",
             owner_id="test_owner",
-            doc_type='MockDoc'
+            doc_type='CommCareCase'
         )
         for cls in [MockIndicators, MockIndicatorsWithGetters]:
             classname = cls.__name__
@@ -196,8 +200,9 @@ class FluffTest(TestCase):
     def test_calculator_calculate(self):
         calc = ValueCalculator(WEEK)
         calc.fluff = MockIndicators
-        values = calc.calculate(MockDoc.wrap(dict(actions=[dict(date="2012-09-23", x=2),
-                                                           dict(date="2012-09-24", x=3)])))
+        values = calc.calculate(CommCareCase.wrap(dict(actions=[
+            dict(date="2012-09-23T00:00:00.000000Z", x=2),
+            dict(date="2012-09-24T00:00:00.000000Z", x=3)])))
         self.assertEquals(len(list(values)), 8)
         self.assertEquals(values['null_value'], [dict(date=None, value=2, group_by=None)])
         self.assertEquals(values['date_value'], [
@@ -443,15 +448,18 @@ class FluffTest(TestCase):
         self.assertRaises(AssertionError, num_field.calculate, 'bar')
 
     def test_save_to_sql(self):
-        actions = [dict(date="2012-09-23", x=2), dict(date="2012-09-24", x=3)]
+        actions = [
+            dict(date="2012-09-23T00:00:00.000000Z", x=2),
+            dict(date="2012-09-24T00:00:00.000000Z", x=3)
+        ]
         doc = dict(
             actions=actions,
-            get_id="123",
+            _id="123",
             domain="mock",
             owner_id="test_owner"
         )
         current = MockIndicatorsSql(_id='234')
-        current.calculate(MockDoc.wrap(doc))
+        current.calculate(CommCareCase.wrap(doc))
         current.save_to_sql(current.diff(None), self.engine)
         expected = [
             ('123', date(1, 1, 1), 'mock', 'test_owner', None, None, None, None, None, 2, None, 1),
@@ -471,15 +479,15 @@ class FluffTest(TestCase):
     def test_save_to_sql_update(self):
         self.test_save_to_sql()
 
-        actions = [dict(date="2012-09-23", x=5)]
+        actions = [dict(date="2012-09-23T00:00:00.000000Z", x=5)]
         doc = dict(
             actions=actions,
-            get_id="123",
+            _id="123",
             domain="mock",
             owner_id="test_owner"
         )
         current = MockIndicatorsSql(_id='234')
-        current.calculate(MockDoc.wrap(doc))
+        current.calculate(CommCareCase.wrap(doc))
         current.save_to_sql(current.diff(None), self.engine)
         expected = [
             ('123', date(1, 1, 1), 'mock', 'test_owner', None, None, None, None, None, 2, None, 1),
@@ -496,25 +504,28 @@ class FluffTest(TestCase):
                 self.assertIn(row, expected)
 
     def test_save_to_sql_flat_fields(self):
-        actions = [dict(date="2012-09-23", x=2), dict(date="2012-09-24", x=3)]
+        actions = [
+            dict(date="2012-09-23T00:00:00.000000Z", x=2),
+            dict(date="2012-09-24T00:00:00.000000Z", x=3)
+        ]
         doc = dict(
             actions=actions,
-            opened_on="2012-09-23",
-            closed_on="2013-09-23",
-            get_id="123",
+            opened_on="2012-09-23T00:00:00.000000Z",
+            closed_on="2013-09-23T00:00:00.000000Z",
+            _id="123",
             domain="mock",
             owner_id="test_owner"
         )
         current = MockIndicatorsSqlWithFlatFields(_id='234')
-        current.calculate(MockDoc.wrap(doc))
+        current.calculate(CommCareCase.wrap(doc))
         current.save_to_sql(current.diff(None), self.engine)
         expected = [
-            ('123', date(2012, 9, 24), '2012-09-23', '2013-09-23', 'mock', 'test_owner', 3, None, None, None, None, None, 1, None),
-            ('123', date(2013, 1, 1), '2012-09-23', '2013-09-23', 'abc', '123', None, None, 2, None, 1, None, None, None),
-            ('123', date(1, 1, 1), '2012-09-23', '2013-09-23', 'abc', 'xyz', None, None, None, 1, None, None, None, None),
-            ('123', date(2012, 9, 23), '2012-09-23', '2013-09-23', 'mock', 'test_owner', 2, None, None, None, None, None, 1, None),
-            ('123', date(1, 1, 1), '2012-09-23', '2013-09-23', 'mock', 'test_owner', None, None, None, None, None, 2, None, 1),
-            ('123', date(2013, 1, 1), '2012-09-23', '2013-09-23', 'abc', 'xyz', None, 3, None, None, None, None, None, None),
+            ('123', date(2012, 9, 24), '2012-09-23 00:00:00', '2013-09-23 00:00:00', 'mock', 'test_owner', 3, None, None, None, None, None, 1, None),
+            ('123', date(2013, 1, 1), '2012-09-23 00:00:00', '2013-09-23 00:00:00', 'abc', '123', None, None, 2, None, 1, None, None, None),
+            ('123', date(1, 1, 1), '2012-09-23 00:00:00', '2013-09-23 00:00:00', 'abc', 'xyz', None, None, None, 1, None, None, None, None),
+            ('123', date(2012, 9, 23), '2012-09-23 00:00:00', '2013-09-23 00:00:00', 'mock', 'test_owner', 2, None, None, None, None, None, 1, None),
+            ('123', date(1, 1, 1), '2012-09-23 00:00:00', '2013-09-23 00:00:00', 'mock', 'test_owner', None, None, None, None, None, 2, None, 1),
+            ('123', date(2013, 1, 1), '2012-09-23 00:00:00', '2013-09-23 00:00:00', 'abc', 'xyz', None, 3, None, None, None, None, None, None),
         ]
 
         with self.engine.begin() as connection:
@@ -524,13 +535,16 @@ class FluffTest(TestCase):
                 self.assertIn(row, expected)
 
     def test_deleting_on_doc_type_change(self):
-        actions = [dict(date="2012-09-23", x=2), dict(date="2012-09-24", x=3)]
+        actions = [
+            dict(date="2012-09-23T00:00:00.000000Z", x=2),
+            dict(date="2012-09-24T00:00:00.000000Z", x=3)
+        ]
         doc = dict(
             actions=actions,
-            get_id="123",
+            _id="123",
             domain="mock",
             owner_id="test_owner",
-            doc_type='MockDoc'
+            doc_type='CommCareCase'
         )
         for cls in [MockIndicators, MockIndicatorsWithGetters]:
             classname = cls.__name__
@@ -539,7 +553,7 @@ class FluffTest(TestCase):
             indicator = self.fakedb.mock_docs.get("%s-123" % classname, None)
             self.assertIsNotNone(indicator)
 
-        doc['doc_type'] = 'MockArchive'
+        doc['doc_type'] = 'CommCareCase-DELETED'
         for cls in [MockIndicators, MockIndicatorsWithGetters]:
             classname = cls.__name__
             pillow = cls.pillow()()
@@ -548,13 +562,16 @@ class FluffTest(TestCase):
             self.assertIsNone(indicator)
 
     def test_deleting_on_doc_type_change_sql(self):
-        actions = [dict(date="2012-09-23", x=2), dict(date="2012-09-24", x=3)]
+        actions = [
+            dict(date="2012-09-23T00:00:00.000000Z", x=2),
+            dict(date="2012-09-24T00:00:00.000000Z", x=3)
+        ]
         doc = dict(
             actions=actions,
-            get_id="123",
+            _id="123",
             domain="mock",
             owner_id="test_owner",
-            doc_type='MockDoc'
+            doc_type='CommCareCase'
         )
 
         for cls in [MockIndicatorsSql]:
@@ -564,21 +581,13 @@ class FluffTest(TestCase):
                 rows = connection.execute(sqlalchemy.select([cls._table]))
                 self.assertEqual(rows.rowcount, 6)
 
-        doc['doc_type'] = 'MockArchive'
+        doc['doc_type'] = 'CommCareCase-DELETED'
         for cls in [MockIndicatorsSql]:
             pillow = cls.pillow()()
             pillow.process_change(change_from_couch_row({'changes': [], 'id': '123', 'seq': 1, 'doc': doc}))
             with self.engine.begin() as connection:
                 rows = connection.execute(sqlalchemy.select([cls._table]))
                 self.assertEqual(rows.rowcount, 0)
-
-
-class MockDoc(Document):
-    _doc_type = "Mock"
-
-
-class MockDocArchive(Document):
-    _doc_type = "MockArchive"
 
 
 class ValueCalculator(fluff.Calculator):
@@ -620,11 +629,11 @@ class ValueCalculator(fluff.Calculator):
 
 class MockIndicators(fluff.IndicatorDocument):
 
-    document_class = MockDoc
+    document_class = CommCareCase
     group_by = ('domain', 'owner_id')
     group_by_type_map = {'domain': fluff.TYPE_INTEGER}
     domains = ('mock',)
-    deleted_types = ('MockArchive',)
+    deleted_types = ('CommCareCase-DELETED',)
     save_direct_to_sql = False
 
     value_week = ValueCalculator(window=WEEK)
@@ -635,14 +644,14 @@ class MockIndicators(fluff.IndicatorDocument):
 
 class MockIndicatorsWithGetters(fluff.IndicatorDocument):
 
-    document_class = MockDoc
+    document_class = CommCareCase
     group_by = (
         fluff.AttributeGetter('domain'),
         fluff.AttributeGetter('owner_id', getter_function=lambda item: item['owner_id'])
     )
     group_by_type_map = {'domain': fluff.TYPE_INTEGER}
     domains = ('mock',)
-    deleted_types = ('MockArchive',)
+    deleted_types = ('CommCareCase-DELETED',)
     save_direct_to_sql = False
 
     value_week = ValueCalculator(window=WEEK)
@@ -653,11 +662,11 @@ class MockIndicatorsWithGetters(fluff.IndicatorDocument):
 
 class MockIndicatorsSql(fluff.IndicatorDocument):
 
-    document_class = MockDoc
+    document_class = CommCareCase
     group_by = ('domain', 'owner_id')
     group_by_type_map = {'domain': fluff.TYPE_STRING}
     domains = ('mock',)
-    deleted_types = ('MockArchive',)
+    deleted_types = ('CommCareCase-DELETED',)
 
     value_week = ValueCalculator(window=WEEK)
 
@@ -667,7 +676,7 @@ class MockIndicatorsSql(fluff.IndicatorDocument):
 
 class MockIndicatorsSqlWithFlatFields(fluff.IndicatorDocument):
 
-    document_class = MockDoc
+    document_class = CommCareCase
     group_by = ('domain', 'owner_id')
     group_by_type_map = {'domain': fluff.TYPE_STRING}
     domains = ('mock',)
