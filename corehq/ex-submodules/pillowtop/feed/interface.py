@@ -93,7 +93,7 @@ class Change(object):
         self.metadata.attempts += 1
         self.metadata.date_last_attempt = date or datetime.utcnow()
         error_type = path_from_object(exception)
-        self.last_error_type = error_type
+        self.metadata.last_error_type = error_type
         error_count = self.metadata.attempts_by_error.get(error_type, None) or 0
         self.metadata.attempts_by_error[error_type] = error_count + 1
         self.metadata.last_error_traceback = "{}\n\n{}".format(
