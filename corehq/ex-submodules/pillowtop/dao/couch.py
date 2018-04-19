@@ -16,6 +16,10 @@ class CouchDocumentStore(DocumentStore):
         self.domain = domain
         self.doc_type = doc_type
 
+    @property
+    def data_source_name(self):
+        return self._couch_db.dbname
+
     def get_document(self, doc_id):
         try:
             return self._couch_db.get(doc_id)
