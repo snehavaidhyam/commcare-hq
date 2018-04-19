@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 from couchdbkit import ChangesStream
 
+from corehq.util.exceptions import DocumentClassNotFound
 from pillowtop.dao.couch import CouchDocumentStore
 from pillowtop.feed.interface import ChangeFeed, Change
 from pillowtop.utils import force_seq_int
@@ -46,22 +47,30 @@ class CouchChangeFeed(ChangeFeed):
         return self._couch_db
 
 
-def change_from_couch_row(couch_change, document_store=None, data_source_name=None):
+def change_from_couch_row(couch_change, document_store=None):
     from corehq.apps.change_feed.data_sources import COUCH
-    from corehq.apps.change_feed.document_types import change_meta_from_doc
+    from corehq.apps.change_feed.document_types import (
+        get_doc_meta_object_from_document, change_meta_from_doc_meta_and_document
+    )
     from corehq.apps.change_feed.exceptions import MissingMetaInformationError
-
-    if not (document_store or data_source_name):
-        raise ValueError("One of document store or data_source_name is required")
+    from corehq.util.couchdb_management import couch_config
 
     doc_id = couch_change['id']
     document = couch_change.get('doc', None)
-    if not document and document_store:
+    if not document:
+        assert document_store, "Document store required if doc not provided"
         document = document_store.get_document(doc_id)
 
-    data_source_name = data_source_name or document_store.data_source_name
+    doc_meta = get_doc_meta_object_from_document(document)
+    if document_store:
+        data_source_name = document_store.data_source_name
+    else:
+        doc_type = doc_meta.raw_doc_type.split('-')[0]
+        db = couch_config.get_db_for_doc_type(doc_type)
+        data_source_name = db.dbname
+
     try:
-        change_meta = change_meta_from_doc(document, COUCH, data_source_name)
+        change_meta = change_meta_from_doc_meta_and_document(doc_meta, document, COUCH, data_source_name)
     except MissingMetaInformationError:
         change_meta = None
 
