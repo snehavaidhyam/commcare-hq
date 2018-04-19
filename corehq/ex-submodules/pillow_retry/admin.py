@@ -12,7 +12,6 @@ class PillowErrorAdmin(admin.ModelAdmin):
         'error_type',
         'date_created',
         'date_last_attempt',
-        'date_next_attempt'
     ]
     list_filter = ('pillow', 'error_type')
 
