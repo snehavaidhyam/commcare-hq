@@ -66,12 +66,6 @@ class Command(BaseCommand):
         )
         deploy.save()
 
-        #  reset PillowTop errors in the hope that a fix has been deployed
-        rows_updated = PillowError.bulk_reset_attempts(datetime.utcnow())
-        if rows_updated:
-            print("\n---------------- Pillow Errors Reset ----------------\n" \
-                  "{} pillow errors queued for retry\n".format(rows_updated))
-
         deploy_notification_text = (
             "CommCareHQ has been successfully deployed to *{}* by *{}* in *{}* minutes. ".format(
                 options['environment'],

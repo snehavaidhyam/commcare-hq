@@ -120,20 +120,6 @@ class PillowError(models.Model):
         return getattr(settings, 'PILLOW_RETRY_MULTI_ATTEMPTS_CUTOFF', default)
 
     @classmethod
-    def bulk_reset_attempts(cls, last_attempt_lt, attempts_gte=None):
-        if attempts_gte is None:
-            attempts_gte = settings.PILLOW_RETRY_QUEUE_MAX_PROCESSING_ATTEMPTS
-
-        multi_attempts_cutoff = cls.multi_attempts_cutoff()
-        return PillowError.objects.filter(
-            models.Q(date_last_attempt__lt=last_attempt_lt),
-            models.Q(current_attempt__gte=attempts_gte) | models.Q(total_attempts__gte=multi_attempts_cutoff)
-        ).update(
-            current_attempt=0,
-            date_next_attempt=datetime.utcnow()
-        )
-
-    @classmethod
     def get_pillows(cls):
         results = PillowError.objects.values('pillow').annotate(count=Count('pillow'))
         return (p['pillow'] for p in results)

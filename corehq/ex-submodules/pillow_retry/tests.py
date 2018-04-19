@@ -186,34 +186,6 @@ class PillowRetryTestCase(TestCase):
         with self.assertRaises(PillowError.DoesNotExist):
             PillowError.objects.get(id=error.id)
 
-    def test_bulk_reset(self):
-        for i in range(0, 5):
-            error = create_error(_change(id=i), attempts=settings.PILLOW_RETRY_QUEUE_MAX_PROCESSING_ATTEMPTS)
-            error.save()
-
-        errors = PillowError.get_errors_to_process(datetime.utcnow()).all()
-        self.assertEqual(len(errors), 0)
-
-        PillowError.bulk_reset_attempts(datetime.utcnow())
-
-        errors = PillowError.get_errors_to_process(datetime.utcnow()).all()
-        self.assertEqual(len(errors), 5)
-
-    def test_bulk_reset_cutoff(self):
-        for i in range(0, 3):
-            error = create_error(_change(id=i), attempts=1)
-            if i >= 1:
-                error.total_attempts = PillowError.multi_attempts_cutoff() + 1
-            error.save()
-
-        errors = PillowError.get_errors_to_process(datetime.utcnow()).all()
-        self.assertEqual(len(errors), 0)
-
-        PillowError.bulk_reset_attempts(datetime.utcnow())
-
-        errors = PillowError.get_errors_to_process(datetime.utcnow()).all()
-        self.assertEqual(len(errors), 2)
-
     def test_pillow_not_found(self):
         error = PillowError.objects.create(
             doc_id='missing-pillow',
