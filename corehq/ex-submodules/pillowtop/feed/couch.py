@@ -70,7 +70,9 @@ def change_from_couch_row(couch_change, document_store=None):
         data_source_name = db.dbname
 
     try:
-        change_meta = change_meta_from_doc_meta_and_document(doc_meta, document, COUCH, data_source_name)
+        change_meta = change_meta_from_doc_meta_and_document(
+            doc_meta, document, COUCH, data_source_name, doc_id=doc_id
+        )
     except MissingMetaInformationError:
         change_meta = None
 

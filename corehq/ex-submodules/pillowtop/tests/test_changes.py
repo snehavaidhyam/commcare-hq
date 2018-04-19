@@ -14,7 +14,7 @@ class TestCouchChange(SimpleTestCase):
     def test_convert_to_and_from_couch_row(self):
         couch_row = {
             'id': 'an-id',
-            'doc': {'a': 'document'},
+            'doc': {'a': 'document', 'doc_type': 'CommCareCase'},
             'seq': '21',
             'deleted': False
         }

@@ -15,6 +15,7 @@ from corehq.pillows.case import get_case_to_elasticsearch_pillow
 from corehq.pillows.mappings.case_mapping import CASE_INDEX_INFO
 from corehq.util.test_utils import trap_extra_setup
 from corehq.util.elastic import ensure_index_deleted
+from pillowtop.feed.couch import change_from_couch_row
 from pillowtop.feed.interface import Change, ChangeMeta
 from pillowtop.dao.exceptions import DocumentMismatchError
 
@@ -43,7 +44,7 @@ class ChangeFeedPillowTest(SimpleTestCase):
             'type': 'mother',
             'domain': 'kafka-test-domain',
         }
-        self.pillow.process_change(Change(id='test-id', sequence_id='3', document=document))
+        self.pillow.process_change(self._change_for_doc(document))
         message = next(self.consumer)
 
         change_meta = change_meta_from_kafka_message(message.value)
@@ -64,7 +65,7 @@ class ChangeFeedPillowTest(SimpleTestCase):
             'type': 'mother',
             'domain': u'हिंदी',
         }
-        self.pillow.process_change(Change(id='test-id', sequence_id='3', document=document))
+        self.pillow.process_change(self._change_for_doc(document))
         message = next(self.consumer)
         change_meta = change_meta_from_kafka_message(message.value)
         self.assertEqual(document['domain'], change_meta.domain)
@@ -75,7 +76,7 @@ class ChangeFeedPillowTest(SimpleTestCase):
             'type': 'mother',
             'domain': None,
         }
-        self.pillow.process_change(Change(id='test-id', sequence_id='3', document=document))
+        self.pillow.process_change(self._change_for_doc(document))
         message = next(self.consumer)
         change_meta = change_meta_from_kafka_message(message.value)
         self.assertEqual(document['domain'], change_meta.domain)
@@ -86,10 +87,13 @@ class ChangeFeedPillowTest(SimpleTestCase):
             'type': 'mother',
             'domain': None,
         }
-        self.pillow.process_change(Change(id='test-id', sequence_id='3', document=document))
+        self.pillow.process_change(self._change_for_doc(document))
         message = next(self.consumer)
         change_meta = change_meta_from_kafka_message(message.value)
         self.assertLessEqual(change_meta.publish_timestamp, datetime.utcnow())
+
+    def _change_for_doc(self, document):
+        return change_from_couch_row({'id': 'test-id', 'seq': '3', 'doc': document})
 
 
 class TestElasticProcessorPillows(TestCase):
