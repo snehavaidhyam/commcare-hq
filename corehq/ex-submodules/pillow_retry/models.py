@@ -73,53 +73,6 @@ class PillowError(models.Model):
         return error
 
     @classmethod
-    def get_errors_to_process(cls, utcnow, limit=None, skip=0, fetch_full=False):
-        """
-        Get errors according the following rules:
-
-            date_next_attempt <= utcnow
-            AND
-            (
-                total_attempts <= multi_attempt_cutoff & current_attempt <= max_attempts
-                OR
-                total_attempts > multi_attempt_cutoff & current_attempt 0
-            )
-
-        where:
-        * multi_attempt_cutoff = settings.PILLOW_RETRY_MULTI_ATTEMPTS_CUTOFF
-        * max_attempts = settings.PILLOW_RETRY_QUEUE_MAX_PROCESSING_ATTEMPTS
-
-        :param utcnow:      The current date and time in UTC.
-        :param limit:       Paging limit param.
-        :param skip:        Paging skip param.
-        :param fetch_full:  If True return the whole PillowError object otherwise return a
-                            a dict containing 'id' and 'date_next_attempt' keys.
-        """
-        max_attempts = settings.PILLOW_RETRY_QUEUE_MAX_PROCESSING_ATTEMPTS
-        multi_attempts_cutoff = cls.multi_attempts_cutoff()
-        query = PillowError.objects \
-            .filter(date_next_attempt__lte=utcnow) \
-            .filter(
-                models.Q(current_attempt=0) |
-                (models.Q(total_attempts__lte=multi_attempts_cutoff) & models.Q(current_attempt__lte=max_attempts))
-            )
-
-        # temporarily disable queuing of ConfigurableReportKafkaPillow errors
-        query = query.filter(~models.Q(pillow='corehq.apps.userreports.pillow.ConfigurableReportKafkaPillow'))
-
-        if not fetch_full:
-            query = query.values('id', 'date_next_attempt')
-        if limit is not None:
-            return query[skip:skip+limit]
-        else:
-            return query
-
-    @classmethod
-    def multi_attempts_cutoff(cls):
-        default = settings.PILLOW_RETRY_QUEUE_MAX_PROCESSING_ATTEMPTS * 3
-        return getattr(settings, 'PILLOW_RETRY_MULTI_ATTEMPTS_CUTOFF', default)
-
-    @classmethod
     def get_pillows(cls):
         results = PillowError.objects.values('pillow').annotate(count=Count('pillow'))
         return (p['pillow'] for p in results)
