@@ -52,10 +52,7 @@ class GetDocProcessor(PillowProcessor):
 
 def create_error(change, message='message', attempts=0, pillow=None, ex_class=None):
     change.metadata = ChangeMeta(data_source_type='couch', data_source_name='test_commcarehq', document_id=change.id)
-    error = PillowError.get_or_create(change.metadata, pillow or FakePillow())
-    for n in range(0, attempts):
-        error.add_attempt(*get_ex_tb(message, ex_class=ex_class))
-    return error
+    return PillowError.get_or_create(change.metadata, pillow or FakePillow())
 
 
 class PillowRetryTestCase(TestCase):
@@ -82,20 +79,6 @@ class PillowRetryTestCase(TestCase):
         self.assertEqual(error.change_object.id, id)
         self.assertEqual(error.change_object.sequence_id, 54321)
 
-    def test_attempts(self):
-        message = 'ex message'
-        error = create_error(_change(id='123'), message=message, attempts=1)
-        self.assertEqual(error.total_attempts, 1)
-        self.assertEqual(error.current_attempt, 1)
-        self.assertTrue(message in error.error_traceback)
-        self.assertEqual(error.error_type, 'pillow_retry.tests.ExceptionA')
-
-        message = 'ex message2'
-        error.add_attempt(*get_ex_tb(message))
-        self.assertEqual(error.total_attempts, 2)
-        self.assertEqual(error.current_attempt, 2)
-        self.assertTrue(message in error.error_traceback)
-
     def test_get_or_create(self):
         message = 'abcd'
         id = '12335'
@@ -114,8 +97,7 @@ class PillowRetryTestCase(TestCase):
 
     def test_deleted_doc(self):
         id = 'test_doc'
-        change_dict = {'id': id, 'seq': 54321}
-        error = create_error(change_from_couch_row(change_dict))
+        error = create_error(_change(id))
         error.save()
         # this used to error out
         # process_pillow_retry(error.id) TODO
@@ -178,7 +160,7 @@ class PillowtopRetryAllPillowsTests(TestCase):
 
         pillow.process_change = MagicMock(side_effect=exc_class(pillow.pillow_id))
         doc = self._get_random_doc()
-        pillow.process_with_error_handling(Change(id=doc['id'], sequence_id='3', document=doc))
+        pillow.process_with_error_handling(_change(doc['id'], doc))
 
         errors = PillowError.objects.filter(pillow=pillow.pillow_id).all()
         self.assertEqual(1, len(errors), pillow_config)
@@ -206,8 +188,9 @@ def _pillow_instance_from_config_with_mock_process_change(pillow_config):
     return instance
 
 
-def _change(id):
-    return Change(id=id, sequence_id=None, metadata=ChangeMeta(
+def _change(id, doc=None):
+    return Change(id=id, sequence_id=None, document=doc, metadata=ChangeMeta(
+        document_id=id,
         data_source_type='couch',
         data_source_name='commcarehq',
     ))
