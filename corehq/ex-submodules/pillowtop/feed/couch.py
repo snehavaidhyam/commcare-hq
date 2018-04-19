@@ -2,9 +2,6 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 from couchdbkit import ChangesStream
 
-from corehq.apps.change_feed.data_sources import COUCH
-from corehq.apps.change_feed.document_types import change_meta_from_doc
-from corehq.apps.change_feed.exceptions import MissingMetaInformationError
 from pillowtop.dao.couch import CouchDocumentStore
 from pillowtop.feed.interface import ChangeFeed, Change
 from pillowtop.utils import force_seq_int
@@ -50,6 +47,10 @@ class CouchChangeFeed(ChangeFeed):
 
 
 def change_from_couch_row(couch_change, document_store=None, data_source_name=None):
+    from corehq.apps.change_feed.data_sources import COUCH
+    from corehq.apps.change_feed.document_types import change_meta_from_doc
+    from corehq.apps.change_feed.exceptions import MissingMetaInformationError
+
     if not (document_store or data_source_name):
         raise ValueError("One of document store or data_source_name is required")
 
