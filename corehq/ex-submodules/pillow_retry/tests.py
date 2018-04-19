@@ -5,6 +5,7 @@ from datetime import datetime
 
 from django.conf import settings
 from django.test import TestCase
+from django.test.utils import override_settings
 from mock import MagicMock
 
 from pillow_retry.models import PillowError
@@ -127,6 +128,7 @@ class ExceptionA(Exception):
     pass
 
 
+@override_settings(PILLOW_RETRY_QUEUE_MAX_PROCESSING_ATTEMPTS=0)
 class PillowtopRetryAllPillowsTests(TestCase):
     @classmethod
     def setUpClass(cls):
