@@ -145,20 +145,20 @@ def case_property_text_query(key, value, fuzziness='0'):
 
 
 def case_property_range_query(key, gt=None, gte=None, lt=None, lte=None):
+    kwargs = {'gt': gt, 'gte': gte, 'lt': lt, 'lte': lte}
     # if its a number, use it
     try:
         # numeric range
-        [float(d) for d in [gt, gte, lt, lte] if d is not None]
+        kwargs = {key: float(value) for key, value in six.iteritems(kwargs) if value is not None}
         return _base_property_query(
             key,
-            queries.range_query("{}.{}".format(CASE_PROPERTIES_PATH, VALUE_NUMERIC), gt, gte, lt, lte)
+            queries.range_query("{}.{}".format(CASE_PROPERTIES_PATH, VALUE_NUMERIC), **kwargs)
         )
     except ValueError:
         pass
 
     # if its a date, use it
     # date range
-    kwargs = {'gt': gt, 'gte': gte, 'lt': lt, 'lte': lte}
     kwargs = {key: parse_date(value) for key, value in six.iteritems(kwargs) if value is not None}
     return _base_property_query(
         key,
