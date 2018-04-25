@@ -39,12 +39,12 @@ def term(field, value):
 
 def OR(*filters):
     """Filter docs to match any of the filters passed in"""
-    return {"or": filters}
+    return {"or": list(filters)}
 
 
 def AND(*filters):
     """Filter docs to match all of the filters passed in"""
-    return {"and": filters}
+    return {"and": list(filters)}
 
 
 def NOT(filter_):
