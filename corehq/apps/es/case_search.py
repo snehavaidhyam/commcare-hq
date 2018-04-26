@@ -110,17 +110,15 @@ class CaseSearchES(CaseES):
             )
         return self
 
-    def get_child_cases(self, case_ids):
+    def get_child_cases(self, case_ids, identifier=None):
         """Returns all cases that reference cases with id: `case_ids`
         """
+        # TODO: Identifier
         if isinstance(case_ids, six.string_types):
             case_ids = [case_ids]
 
         return self._add_query(
-            queries.nested(
-                INDICES_PATH,
-                queries.match(" ".join(case_ids), '{}.{}'.format(INDICES_PATH, REFERENCED_ID))
-            ),
+            related_case_query(case_ids, identifier),
             queries.MUST,
         )
 
@@ -163,6 +161,17 @@ def case_property_range_query(key, gt=None, gte=None, lt=None, lte=None):
     return _base_property_query(
         key,
         queries.date_range("{}.{}".format(CASE_PROPERTIES_PATH, VALUE_DATE), **kwargs)
+    )
+
+
+def related_case_query(case_ids, identifier=None):
+    # TODO use identifier
+    if isinstance(case_ids, six.string_types):
+            case_ids = [case_ids]
+
+    return queries.nested(
+        INDICES_PATH,
+        queries.match(" ".join(case_ids), '{}.{}'.format(INDICES_PATH, REFERENCED_ID))
     )
 
 
