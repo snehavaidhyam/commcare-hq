@@ -7,7 +7,7 @@ from corehq.apps.es import filters
 from corehq.apps.es.case_search import (
     CaseSearchES,
     case_property_range_query,
-    case_property_text_query,
+    exact_case_property_text_query,
     related_case_query,
 )
 
@@ -92,7 +92,7 @@ def build_filter_from_ast(node):
             if isinstance(node.left, Step) and isinstance(node.right, integer_types + (string_types, float)):
                 # This is a leaf
                 # TODO: raise errors if something isn't right (e.g. if the RHS is another Step)
-                q = case_property_text_query(serialize(node.left), node.right, '0')
+                q = exact_case_property_text_query(serialize(node.left), node.right)
                 if node.op == '!=':
                     return filters.NOT(q)
                 return q

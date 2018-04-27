@@ -16,18 +16,22 @@ class TestFilterDsl(SimpleTestCase):
                 "path": "case_properties",
                 "query": {
                     "filtered": {
-                        "filter": {
-                            "term": {
-                                "case_properties.key": "name"
-                            }
-                        },
                         "query": {
-                            "match": {
-                                "case_properties.value": {
-                                    "query": "farid",
-                                    "fuzziness": "0"
+                            "match_all": {}
+                        },
+                        "filter": {
+                            "and": [
+                                {
+                                    "term": {
+                                        "case_properties.key": "name"
+                                    }
+                                },
+                                {
+                                    "term": {
+                                        "case_properties.value.exact": "farid"
+                                    }
                                 }
-                            }
+                            ]
                         }
                     }
                 }
@@ -97,18 +101,23 @@ class TestFilterDsl(SimpleTestCase):
                                 "path": "case_properties",
                                 "query": {
                                     "filtered": {
-                                        "filter": {
-                                            "term": {
-                                                "case_properties.key": "name"
+                                        "query": {
+                                            "match_all": {
                                             }
                                         },
-                                        "query": {
-                                            "match": {
-                                                "case_properties.value": {
-                                                    "query": "farid",
-                                                    "fuzziness": "0"
+                                        "filter": {
+                                            "and": [
+                                                {
+                                                    "term": {
+                                                        "case_properties.key": "name"
+                                                    }
+                                                },
+                                                {
+                                                    "term": {
+                                                        "case_properties.value.exact": "farid"
+                                                    }
                                                 }
-                                            }
+                                            ]
                                         }
                                     }
                                 }
@@ -119,18 +128,23 @@ class TestFilterDsl(SimpleTestCase):
                                 "path": "case_properties",
                                 "query": {
                                     "filtered": {
-                                        "filter": {
-                                            "term": {
-                                                "case_properties.key": "name"
+                                        "query": {
+                                            "match_all": {
                                             }
                                         },
-                                        "query": {
-                                            "match": {
-                                                "case_properties.value": {
-                                                    "query": "leila",
-                                                    "fuzziness": "0"
+                                        "filter": {
+                                            "and": [
+                                                {
+                                                    "term": {
+                                                        "case_properties.key": "name"
+                                                    }
+                                                },
+                                                {
+                                                    "term": {
+                                                        "case_properties.value.exact": "leila"
+                                                    }
                                                 }
-                                            }
+                                            ]
                                         }
                                     }
                                 }

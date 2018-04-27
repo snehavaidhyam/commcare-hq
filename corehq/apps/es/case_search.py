@@ -68,10 +68,10 @@ class CaseSearchES(CaseES):
                 # fuzzy match
                 self._add_query(case_property_text_query(key, value, fuzziness='AUTO'), clause)
                 # exact match. added to improve the score of exact matches
-                ._add_query(case_property_text_query(key, value, fuzziness='0'),
+                ._add_query(exact_case_property_text_query(key, value),
                             queries.SHOULD if positive_clause else clause))
         else:
-            return self._add_query(case_property_text_query(key, value, fuzziness='0'), clause)
+            return self._add_query(exact_case_property_text_query(key, value), clause)
 
     def regexp_case_property_query(self, key, regex, clause=queries.MUST):
         """
@@ -128,6 +128,19 @@ def case_property_filter(key, value):
         filters.AND(
             filters.term("{}.key".format(CASE_PROPERTIES_PATH), key),
             filters.term("{}.{}".format(CASE_PROPERTIES_PATH, VALUE_TEXT), value),
+        )
+    )
+
+
+def exact_case_property_text_query(key, value):
+    return queries.nested(
+        CASE_PROPERTIES_PATH,
+        queries.filtered(
+            queries.match_all(),
+            filters.AND(
+                filters.term('{}.key'.format(CASE_PROPERTIES_PATH), key),
+                filters.term('{}.{}.exact'.format(CASE_PROPERTIES_PATH, VALUE_TEXT), value),
+            )
         )
     )
 
