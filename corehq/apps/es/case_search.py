@@ -9,16 +9,16 @@ from corehq.apps.es import case_search as case_search_es
     q = (case_search_es.CaseSearchES()
          .domain('testproject')
 """
-from __future__ import absolute_import
-from __future__ import unicode_literals
+from __future__ import absolute_import, unicode_literals
 
-from django.utils.dateparse import parse_date
 import six
+from django.utils.dateparse import parse_date
 
 from corehq.apps.case_search.const import (
+    CASE_PROPERTIES_PATH,
+    IDENTIFIER,
     INDICES_PATH,
     REFERENCED_ID,
-    CASE_PROPERTIES_PATH,
     RELEVANCE_SCORE,
     VALUE_DATE,
     VALUE_NUMERIC,
@@ -110,10 +110,9 @@ class CaseSearchES(CaseES):
             )
         return self
 
-    def get_child_cases(self, case_ids, identifier=None):
+    def get_child_cases(self, case_ids, identifier):
         """Returns all cases that reference cases with id: `case_ids`
         """
-        # TODO: Identifier
         if isinstance(case_ids, six.string_types):
             case_ids = [case_ids]
 
@@ -165,24 +164,33 @@ def case_property_range_query(key, gt=None, gte=None, lt=None, lte=None):
 
 
 def related_case_query(case_ids, identifier=None):
-    # TODO use identifier
     if isinstance(case_ids, six.string_types):
             case_ids = [case_ids]
 
+    if identifier is None:      # some old relationships don't have an identifier specified
+        f = filters.term('{}.{}'.format(INDICES_PATH, REFERENCED_ID), " ".join(case_ids)),
+    else:
+        f = filters.AND(
+            filters.term('{}.{}'.format(INDICES_PATH, REFERENCED_ID), " ".join(case_ids)),
+            filters.term('{}.{}'.format(INDICES_PATH, IDENTIFIER), identifier),
+        )
     return queries.nested(
         INDICES_PATH,
-        queries.match(" ".join(case_ids), '{}.{}'.format(INDICES_PATH, REFERENCED_ID))
+        queries.filtered(
+            queries.match_all(),
+            f
+        )
     )
 
 
 def _base_property_query(key, query):
     return queries.nested(
-            CASE_PROPERTIES_PATH,
-            queries.filtered(
-                query,
-                filters.term('{}.key'.format(CASE_PROPERTIES_PATH), key),
-            )
+        CASE_PROPERTIES_PATH,
+        queries.filtered(
+            query,
+            filters.term('{}.key'.format(CASE_PROPERTIES_PATH), key),
         )
+    )
 
 
 def blacklist_owner_id(owner_id):

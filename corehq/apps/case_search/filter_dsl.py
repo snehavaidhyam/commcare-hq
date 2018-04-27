@@ -76,15 +76,16 @@ def build_filter_from_ast(node):
         if _is_related_case_lookup(node):
             # related doc lookup
             ids = parent_property_lookup(node)  # the ids of the highest level cases that match the case_property
-            identifier = None                   # TODO: Identifier
             # walk down the tree and select all child cases
             n = node.left
             while _is_related_case_lookup(n):
                 # Performs a "join" to find related cases
                 # does one lookup per ancestory level
+                identifier = serialize(n.left.right)
                 ids = child_case_lookup(ids, identifier)
                 n = n.left
 
+            identifier = serialize(n.left)
             return related_case_query(ids, identifier)
 
         if node.op in ["=", "!="]:
