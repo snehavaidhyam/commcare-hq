@@ -76,17 +76,25 @@ def build_filter_from_ast(node):
         if _is_related_case_lookup(node):
             # related doc lookup
             ids = parent_property_lookup(node)  # the ids of the highest level cases that match the case_property
+
             # walk down the tree and select all child cases
             n = node.left
+            final_identifier = serialize(n.left)
+            related_case_lookups = []
             while _is_related_case_lookup(n):
-                # Performs a "join" to find related cases
-                # does one lookup per ancestory level
-                identifier = serialize(n.left.right)
-                ids = child_case_lookup(ids, identifier)
+                # find the top level, then walk down
                 n = n.left
+                related_case_lookups.append(n)
 
-            identifier = serialize(n.left)
-            return related_case_query(ids, identifier)
+            if related_case_lookups:
+                final_identifier = serialize(related_case_lookups[0].right)
+                for n in reversed(related_case_lookups):
+                    # Performs a "join" to find related cases
+                    # does one lookup per ancestory level
+                    ids = child_case_lookup(ids, identifier=serialize(n.left))
+                    if not ids:
+                        break
+            return related_case_query(ids, final_identifier)
 
         if node.op in ["=", "!="]:
             if isinstance(node.left, Step) and isinstance(node.right, integer_types + (string_types, float)):
@@ -97,11 +105,10 @@ def build_filter_from_ast(node):
                     return filters.NOT(q)
                 return q
 
-        elif node.op in COMPARISON_MAPPING.keys():
+        if node.op in COMPARISON_MAPPING.keys():
             return case_property_range_query(serialize(node.left), **{COMPARISON_MAPPING[node.op]: node.right})
 
-        else:
-            # This is another branch in the tree
-            return OP_MAPPING[node.op](visit(node.left), visit(node.right))
+        # This is another branch in the tree
+        return OP_MAPPING[node.op](visit(node.left), visit(node.right))
 
     return visit(node)

@@ -181,10 +181,10 @@ def related_case_query(case_ids, identifier=None):
             case_ids = [case_ids]
 
     if identifier is None:      # some old relationships don't have an identifier specified
-        f = filters.term('{}.{}'.format(INDICES_PATH, REFERENCED_ID), " ".join(case_ids)),
+        f = filters.term('{}.{}'.format(INDICES_PATH, REFERENCED_ID), list(case_ids)),
     else:
         f = filters.AND(
-            filters.term('{}.{}'.format(INDICES_PATH, REFERENCED_ID), " ".join(case_ids)),
+            filters.term('{}.{}'.format(INDICES_PATH, REFERENCED_ID), list(case_ids)),
             filters.term('{}.{}'.format(INDICES_PATH, IDENTIFIER), identifier),
         )
     return queries.nested(

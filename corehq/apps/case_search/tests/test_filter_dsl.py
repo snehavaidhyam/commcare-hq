@@ -1,9 +1,18 @@
 from __future__ import absolute_import, unicode_literals
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
+from elasticsearch.exceptions import ConnectionError
 from eulxml.xpath import parse as parse_xpath
 
+from casexml.apps.case.mock import CaseFactory, CaseIndex, CaseStructure
 from corehq.apps.case_search.filter_dsl import build_filter_from_ast
+from corehq.apps.es import CaseSearchES
+from corehq.elastic import get_es_new, send_to_elasticsearch
+from corehq.pillows.case_search import transform_case_for_elasticsearch
+from corehq.pillows.mappings.case_search_mapping import CASE_SEARCH_INDEX_INFO
+from corehq.util.elastic import ensure_index_deleted
+from corehq.util.test_utils import trap_extra_setup
+from pillowtop.es_utils import initialize_index_and_mapping
 
 
 class TestFilterDsl(SimpleTestCase):
@@ -178,3 +187,207 @@ class TestFilterDsl(SimpleTestCase):
 
         built_filter = build_filter_from_ast(parsed)
         self.assertEqual(expected_filter, built_filter)
+
+
+class TestFilterDslLookups(TestCase):
+    maxDiff = None
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestFilterDslLookups, cls).setUpClass()
+        with trap_extra_setup(ConnectionError):
+            cls.es = get_es_new()
+            initialize_index_and_mapping(cls.es, CASE_SEARCH_INDEX_INFO)
+
+        cls.child_case_id = 'child'
+        cls.parent_case_id = 'parent'
+        cls.grandparent_case_id = 'grandparent'
+
+        factory = CaseFactory(domain='domain')
+        grandparent_case = CaseStructure(
+            case_id=cls.grandparent_case_id,
+            attrs={
+                'create': True,
+                'case_type': 'grandparent',
+                'update': {
+                    "foo": "thoo"
+                },
+            })
+        parent_case = CaseStructure(
+            case_id=cls.parent_case_id,
+            attrs={
+                'create': True,
+                'case_type': 'parent',
+                'update': {
+                    "bar": "baz",
+                    "foo": "thoo",
+                },
+            },
+            indices=[CaseIndex(
+                grandparent_case,
+                identifier='grandmother',
+                relationship='child',
+            )])
+        child_case = CaseStructure(
+            case_id=cls.child_case_id,
+            attrs={
+                'create': True,
+                'case_type': 'child',
+                'update': {},
+            },
+            indices=[CaseIndex(
+                parent_case,
+                identifier='mother',
+                relationship='extension',
+            )],
+        )
+        for case in factory.create_or_update_cases([child_case]):
+            send_to_elasticsearch('case_search', transform_case_for_elasticsearch(case.to_json()))
+        cls.es.indices.refresh(CASE_SEARCH_INDEX_INFO.index)
+
+    @classmethod
+    def tearDownClass(self):
+        ensure_index_deleted(CASE_SEARCH_INDEX_INFO.index)
+        super(TestFilterDslLookups, self).tearDownClass()
+
+    def test_parent_lookups(self):
+        parsed = parse_xpath("mother/bar = 'baz'")
+        # return all the cases who's parent (relationship named 'mother') has case property bar = "baz"
+
+        expected_filter = {
+            "nested": {
+                "path": "indices",
+                "query": {
+                    "filtered": {
+                        "query": {
+                            "match_all": {
+                            },
+                        },
+                        "filter": {
+                            "and": [
+                                {
+                                    "terms": {
+                                        "indices.referenced_id": [self.parent_case_id],
+                                    }
+                                },
+                                {
+                                    "term": {
+                                        "indices.identifier": "mother"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+        built_filter = build_filter_from_ast(parsed)
+        self.assertEqual(expected_filter, built_filter)
+        self.assertEqual([self.child_case_id], CaseSearchES().filter(built_filter).values_list('_id', flat=True))
+
+    def test_nested_parent_lookups(self):
+        parsed = parse_xpath("grandmother/mother/foo = 'thoo'")
+        # return all the cases whose grandparent (named grandmother) has the case property foo = "thoo"
+        # both mother and grandmother have property foo = "thoo", but only the mother is returned
+        expected_filter = {
+            "nested": {
+                "path": "indices",
+                "query": {
+                    "filtered": {
+                        "query": {
+                            "match_all": {
+                            },
+                        },
+                        "filter": {
+                            "and": [
+                                {
+                                    "terms": {
+                                        "indices.referenced_id": [self.parent_case_id],
+                                    }
+                                },
+                                {
+                                    "term": {
+                                        "indices.identifier": "mother"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+        built_filter = build_filter_from_ast(parsed)
+        self.assertEqual(expected_filter, built_filter)
+        self.assertEqual([self.child_case_id], CaseSearchES().filter(built_filter).values_list('_id', flat=True))
+
+    def test_nested_parent_lookups_same_identifier(self):
+        factory = CaseFactory(domain='domain')
+        grandparent_case = CaseStructure(
+            case_id='farid',
+            attrs={
+                'create': True,
+                'case_type': 'grandparent',
+                'update': {"name": "farid"},
+            })
+        parent_case = CaseStructure(
+            case_id='leila',
+            attrs={
+                'create': True,
+                'case_type': 'parent',
+                'update': {
+                    "name": "leila",
+                },
+            },
+            indices=[CaseIndex(
+                grandparent_case,
+                identifier='parent',
+                relationship='child',
+            )])
+        child_case = CaseStructure(
+            case_id='grandchild',
+            attrs={
+                'create': True,
+                'case_type': 'child',
+                'update': {"name": "leila's child"},
+            },
+            indices=[CaseIndex(
+                parent_case,
+                identifier='parent',
+                relationship='child',
+            )],
+        )
+        for case in factory.create_or_update_cases([child_case]):
+            send_to_elasticsearch('case_search', transform_case_for_elasticsearch(case.to_json()))
+        self.es.indices.refresh(CASE_SEARCH_INDEX_INFO.index)
+
+        parsed = parse_xpath("parent/parent/name = 'farid'")
+        expected_filter = {
+            "nested": {
+                "path": "indices",
+                "query": {
+                    "filtered": {
+                        "query": {
+                            "match_all": {
+                            },
+                        },
+                        "filter": {
+                            "and": [
+                                {
+                                    "terms": {
+                                        "indices.referenced_id": ['leila'],
+                                    }
+                                },
+                                {
+                                    "term": {
+                                        "indices.identifier": "parent"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+        built_filter = build_filter_from_ast(parsed)
+        self.assertEqual(expected_filter, built_filter)
+        self.assertEqual(['grandchild'], CaseSearchES().filter(built_filter).values_list('_id', flat=True))
