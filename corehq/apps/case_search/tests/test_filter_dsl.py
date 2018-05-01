@@ -46,7 +46,7 @@ class TestFilterDsl(SimpleTestCase):
                 }
             }
         }
-        built_filter = build_filter_from_ast(parsed)
+        built_filter = build_filter_from_ast("domain", parsed)
         self.assertEqual(expected_filter, built_filter)
 
     def test_date_comparison(self):
@@ -72,7 +72,7 @@ class TestFilterDsl(SimpleTestCase):
                 }
             }
         }
-        self.assertEqual(expected_filter, build_filter_from_ast(parsed))
+        self.assertEqual(expected_filter, build_filter_from_ast("domain", parsed))
 
     def test_numeric_comparison(self):
         parsed = parse_xpath("number <= '100.32'")
@@ -97,7 +97,7 @@ class TestFilterDsl(SimpleTestCase):
                 }
             }
         }
-        self.assertEqual(expected_filter, build_filter_from_ast(parsed))
+        self.assertEqual(expected_filter, build_filter_from_ast("domain", parsed))
 
     def test_nested_filter(self):
         parsed = parse_xpath("(name = 'farid' or name = 'leila') and dob <= '2017-02-11'")
@@ -185,7 +185,7 @@ class TestFilterDsl(SimpleTestCase):
             ]
         }
 
-        built_filter = build_filter_from_ast(parsed)
+        built_filter = build_filter_from_ast("domain", parsed)
         self.assertEqual(expected_filter, built_filter)
 
 
@@ -202,8 +202,8 @@ class TestFilterDslLookups(TestCase):
         cls.child_case_id = 'child'
         cls.parent_case_id = 'parent'
         cls.grandparent_case_id = 'grandparent'
-
-        factory = CaseFactory(domain='domain')
+        cls.domain = "domain"
+        factory = CaseFactory(domain=cls.domain)
         grandparent_case = CaseStructure(
             case_id=cls.grandparent_case_id,
             attrs={
@@ -281,7 +281,7 @@ class TestFilterDslLookups(TestCase):
                 }
             }
         }
-        built_filter = build_filter_from_ast(parsed)
+        built_filter = build_filter_from_ast(self.domain, parsed)
         self.assertEqual(expected_filter, built_filter)
         self.assertEqual([self.child_case_id], CaseSearchES().filter(built_filter).values_list('_id', flat=True))
 
@@ -316,12 +316,12 @@ class TestFilterDslLookups(TestCase):
                 }
             }
         }
-        built_filter = build_filter_from_ast(parsed)
+        built_filter = build_filter_from_ast(self.domain, parsed)
         self.assertEqual(expected_filter, built_filter)
         self.assertEqual([self.child_case_id], CaseSearchES().filter(built_filter).values_list('_id', flat=True))
 
     def test_nested_parent_lookups_same_identifier(self):
-        factory = CaseFactory(domain='domain')
+        factory = CaseFactory(domain=self.domain)
         grandparent_case = CaseStructure(
             case_id='farid',
             attrs={
@@ -388,6 +388,6 @@ class TestFilterDslLookups(TestCase):
                 }
             }
         }
-        built_filter = build_filter_from_ast(parsed)
+        built_filter = build_filter_from_ast(self.domain, parsed)
         self.assertEqual(expected_filter, built_filter)
         self.assertEqual(['grandchild'], CaseSearchES().filter(built_filter).values_list('_id', flat=True))

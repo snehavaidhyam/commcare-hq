@@ -34,7 +34,7 @@ def print_ast(node):
     visit(node, 0)
 
 
-def build_filter_from_ast(node):
+def build_filter_from_ast(domain, node):
     """Builds an ES filter from an AST provided by eulxml.xpath.parse
     """
 
@@ -55,12 +55,12 @@ def build_filter_from_ast(node):
         """
         prop = serialize(node.left.right)
         value = node.right
-        return CaseSearchES().case_property_query(prop, value).scroll_ids()  # TODO: domain
+        return CaseSearchES().domain(domain).case_property_query(prop, value).scroll_ids()
 
     def child_case_lookup(case_ids, identifier):
         """returns a list of all case_ids who have parents `case_id` with the relationship `identifier`
         """
-        return CaseSearchES().get_child_cases(case_ids, identifier).scroll_ids()
+        return CaseSearchES().domain(domain).get_child_cases(case_ids, identifier).scroll_ids()
 
     def _is_related_case_lookup(node):
         """Returns whether a particular AST node is a related case lookup
