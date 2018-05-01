@@ -1,5 +1,6 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
+from eulxml.xpath import parse as parse_xpath
 from eulxml.xpath.ast import Step, serialize
 from six import integer_types, string_types
 
@@ -63,9 +64,8 @@ def build_filter_from_ast(domain, node):
     def parent_property_lookup(node):
         """given a node of the form `parent/foo = 'thing'`, all case_ids where `foo = thing`
         """
-        prop = serialize(node.left.right)
-        value = node.right
-        return CaseSearchES().domain(domain).case_property_query(prop, value).scroll_ids()
+        new_query = parse_xpath("{} {} '{}'".format(serialize(node.left.right), node.op, node.right))
+        return CaseSearchES().domain(domain).filter(build_filter_from_ast(domain, new_query)).scroll_ids()
 
     def child_case_lookup(case_ids, identifier):
         """returns a list of all case_ids who have parents `case_id` with the relationship `identifier`
@@ -87,9 +87,6 @@ def build_filter_from_ast(domain, node):
             )
 
         if _is_related_case_lookup(node):
-            if node.op != EQ:
-                raise CaseFilterError("Parent property lookup filters can only use '='", serialize(node))
-
             # related doc lookup
             ids = parent_property_lookup(node)  # the ids of the highest level cases that match the case_property
 
