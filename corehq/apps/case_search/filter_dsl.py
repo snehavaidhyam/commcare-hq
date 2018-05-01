@@ -12,6 +12,13 @@ from corehq.apps.es.case_search import (
 )
 
 
+class CaseFilterError(Exception):
+
+    def __init__(self, message, filter_part):
+        self.filter_part = filter_part
+        super(CaseFilterError, self).__init__(message)
+
+
 def print_ast(node):
     """Prints the AST provided by eulxml.xpath.parse
 
@@ -50,6 +57,9 @@ def build_filter_from_ast(domain, node):
         '<=': 'lte',
     }
 
+    EQ = "="
+    NEQ = "!="
+
     def parent_property_lookup(node):
         """given a node of the form `parent/foo = 'thing'`, all case_ids where `foo = thing`
         """
@@ -71,9 +81,15 @@ def build_filter_from_ast(domain, node):
 
     def visit(node):
         if not hasattr(node, 'op'):
-            raise ValueError("Malformed query")
+            raise CaseFilterError(
+                "Malformed filter. Your filter is required to have at least one operator.",
+                serialize(node)
+            )
 
         if _is_related_case_lookup(node):
+            if node.op != EQ:
+                raise CaseFilterError("Parent property lookup filters can only use '='", serialize(node))
+
             # related doc lookup
             ids = parent_property_lookup(node)  # the ids of the highest level cases that match the case_property
 
@@ -96,7 +112,7 @@ def build_filter_from_ast(domain, node):
                         break
             return related_case_query(ids, final_identifier)
 
-        if node.op in ["=", "!="]:
+        if node.op in [EQ, NEQ]:
             if isinstance(node.left, Step) and isinstance(node.right, integer_types + (string_types, float)):
                 # This is a leaf
                 # TODO: raise errors if something isn't right (e.g. if the RHS is another Step)
