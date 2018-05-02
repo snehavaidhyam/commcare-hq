@@ -75,23 +75,15 @@ def build_filter_from_ast(domain, node):
 
         # walk down the tree and select all child cases
         n = node.left
-        final_identifier = serialize(n.left)
-        related_case_lookups = []
         while is_related_case_lookup(n):
-            # the query is expressed in the opposite way that we want to traverse,
-            # so read all the levels, then reverse it
             n = n.left
-            related_case_lookups.append(n)
-
-        if related_case_lookups:
-            final_identifier = serialize(related_case_lookups[0].right)
-            for n in reversed(related_case_lookups):
-                # Performs a "join" to find related cases
-                # Fetches all the case ids from ES which are children of the previous level
-                # This has the potential to be a very large list
-                ids = child_case_lookup(ids, identifier=serialize(n.left))
-                if not ids:
-                    break
+            # Performs a "join" to find related cases
+            # Fetches all the case ids from ES which are children of the previous level
+            # This has the potential to be a very large list
+            ids = child_case_lookup(ids, identifier=serialize(n.right))
+            if not ids:
+                break
+        final_identifier = serialize(n.left)
         return related_case_query(ids, final_identifier)
 
     def parent_property_lookup(node):
