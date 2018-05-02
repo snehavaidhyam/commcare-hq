@@ -1,7 +1,6 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
 from django.utils.translation import ugettext as _
-from eulxml.xpath import parse as parse_xpath
 from eulxml.xpath.ast import Step, serialize
 from six import integer_types, string_types
 
@@ -65,8 +64,8 @@ def build_filter_from_ast(domain, node):
     def parent_property_lookup(node):
         """given a node of the form `parent/foo = 'thing'`, all case_ids where `foo = thing`
         """
-        new_query = parse_xpath("{} {} '{}'".format(serialize(node.left.right), node.op, node.right))
-        return CaseSearchES().domain(domain).filter(build_filter_from_ast(domain, new_query)).scroll_ids()
+        new_query = "{} {} '{}'".format(serialize(node.left.right), node.op, node.right)
+        return CaseSearchES().domain(domain).xpath_query(domain, new_query).scroll_ids()
 
     def child_case_lookup(case_ids, identifier):
         """returns a list of all case_ids who have parents `case_id` with the relationship `identifier`
