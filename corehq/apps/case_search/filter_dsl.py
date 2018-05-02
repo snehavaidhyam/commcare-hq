@@ -61,8 +61,41 @@ def build_filter_from_ast(domain, node):
     EQ = "="
     NEQ = "!="
 
+    def walk_related_cases(node):
+        """Return a query that will fulfill the filter on the related case.
+
+        Since ES has no way of performing joins, we filter down in stages:
+        1. Find the ids of all cases where the condition is met
+        2. Walk down the case hierarchy, finding all related cases with the right identifier to the ids
+        found in (1).
+        3. Return the lowest of these ids as an related case query filter
+        """
+
+        ids = parent_property_lookup(node)  # the ids of the highest level cases that match the case_property
+
+        # walk down the tree and select all child cases
+        n = node.left
+        final_identifier = serialize(n.left)
+        related_case_lookups = []
+        while is_related_case_lookup(n):
+            # the query is expressed in the opposite way that we want to traverse,
+            # so read all the levels, then reverse it
+            n = n.left
+            related_case_lookups.append(n)
+
+        if related_case_lookups:
+            final_identifier = serialize(related_case_lookups[0].right)
+            for n in reversed(related_case_lookups):
+                # Performs a "join" to find related cases
+                # Fetches all the case ids from ES which are children of the previous level
+                # This has the potential to be a very large list
+                ids = child_case_lookup(ids, identifier=serialize(n.left))
+                if not ids:
+                    break
+        return related_case_query(ids, final_identifier)
+
     def parent_property_lookup(node):
-        """given a node of the form `parent/foo = 'thing'`, all case_ids where `foo = thing`
+        """given a node of the form `parent/foo = 'thing'`, return all case_ids where `foo = thing`
         """
         new_query = "{} {} '{}'".format(serialize(node.left.right), node.op, node.right)
         return CaseSearchES().domain(domain).xpath_query(domain, new_query).scroll_ids()
@@ -72,7 +105,7 @@ def build_filter_from_ast(domain, node):
         """
         return CaseSearchES().domain(domain).get_child_cases(case_ids, identifier).scroll_ids()
 
-    def _is_related_case_lookup(node):
+    def is_related_case_lookup(node):
         """Returns whether a particular AST node is a related case lookup
 
         e.g. `parent/host/thing = 'foo'`
@@ -86,28 +119,9 @@ def build_filter_from_ast(domain, node):
                 serialize(node)
             )
 
-        if _is_related_case_lookup(node):
-            # related doc lookup
-            ids = parent_property_lookup(node)  # the ids of the highest level cases that match the case_property
-
-            # walk down the tree and select all child cases
-            n = node.left
-            final_identifier = serialize(n.left)
-            related_case_lookups = []
-            while _is_related_case_lookup(n):
-                # find the top level, then walk down
-                n = n.left
-                related_case_lookups.append(n)
-
-            if related_case_lookups:
-                final_identifier = serialize(related_case_lookups[0].right)
-                for n in reversed(related_case_lookups):
-                    # Performs a "join" to find related cases
-                    # does one lookup per ancestory level
-                    ids = child_case_lookup(ids, identifier=serialize(n.left))
-                    if not ids:
-                        break
-            return related_case_query(ids, final_identifier)
+        if is_related_case_lookup(node):
+            # this node represents a filter on a property for a related case
+            return walk_related_cases(node)
 
         if node.op in [EQ, NEQ]:
             if isinstance(node.left, Step) and isinstance(node.right, integer_types + (string_types, float)):
@@ -132,7 +146,13 @@ def build_filter_from_ast(domain, node):
         if node.op in COMPARISON_MAPPING.keys():
             return case_property_range_query(serialize(node.left), **{COMPARISON_MAPPING[node.op]: node.right})
 
-        # This is another branch in the tree
-        return OP_MAPPING[node.op](visit(node.left), visit(node.right))
+        if node.op in OP_MAPPING.keys():
+            # This is another branch in the tree
+            return OP_MAPPING[node.op](visit(node.left), visit(node.right))
+
+        raise CaseFilterError(
+            _("We don't know what to do with operator '{}'. Please try reformatting your query.".format(node.op)),
+            serialize(node)
+        )
 
     return visit(node)

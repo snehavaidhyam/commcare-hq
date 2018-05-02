@@ -114,9 +114,10 @@ class CaseSearchES(CaseES):
 
         try:
             return self.filter(build_filter_from_ast(domain, parse_xpath(xpath)))
-        except TypeError as e:
+        except (TypeError, RuntimeError) as e:
             raise CaseFilterError(
-                _("Malformed query: {}".format(e))
+                _("Malformed query: {}".format(e)),
+                None,
             )
 
     def _add_query(self, new_query, clause):
