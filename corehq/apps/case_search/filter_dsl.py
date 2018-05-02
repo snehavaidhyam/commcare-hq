@@ -1,5 +1,6 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
+from django.utils.translation import ugettext as _
 from eulxml.xpath import parse as parse_xpath
 from eulxml.xpath.ast import Step, serialize
 from six import integer_types, string_types
@@ -82,7 +83,7 @@ def build_filter_from_ast(domain, node):
     def visit(node):
         if not hasattr(node, 'op'):
             raise CaseFilterError(
-                "Malformed filter. Your filter is required to have at least one operator.",
+                _("Your filter is required to have at least one boolean operator (e.g. '=', '!=')"),
                 serialize(node)
             )
 
@@ -111,12 +112,23 @@ def build_filter_from_ast(domain, node):
 
         if node.op in [EQ, NEQ]:
             if isinstance(node.left, Step) and isinstance(node.right, integer_types + (string_types, float)):
-                # This is a leaf
-                # TODO: raise errors if something isn't right (e.g. if the RHS is another Step)
+                # This is a leaf node
                 q = exact_case_property_text_query(serialize(node.left), node.right)
                 if node.op == '!=':
                     return filters.NOT(q)
                 return q
+            elif isinstance(node.right, Step):
+                raise CaseFilterError(
+                    _("You cannot reference a case property on the right side "
+                      "of a boolean operation. If \"{}\" is meant to be a value, please surround it with "
+                      "quotation marks.").format(serialize(node.right)),
+                    serialize(node)
+                )
+            else:
+                raise CaseFilterError(
+                    _("We didn't understand what you were trying to do with {}").format(serialize(node)),
+                    serialize(node)
+                )
 
         if node.op in COMPARISON_MAPPING.keys():
             return case_property_range_query(serialize(node.left), **{COMPARISON_MAPPING[node.op]: node.right})

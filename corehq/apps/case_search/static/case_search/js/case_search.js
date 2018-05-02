@@ -45,6 +45,10 @@ hqDefine('case_search/js/case_search', function(){
                     self.results(data.values);
                     self.count(data.count);
                 },
+                error: function(response){
+                    var alert_user = hqImport("hqwebapp/js/alert_user").alert_user;
+                    alert_user(response.responseJSON.message, 'danger');
+                }
             });
         };
 
