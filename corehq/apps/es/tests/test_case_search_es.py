@@ -197,7 +197,8 @@ class TestCaseSearchES(ElasticTestMixin, SimpleTestCase):
                             {'key': 'foo', 'value': 'bar'},
                             {'key': 'baz', 'value': 'buzz'}]
                     }
-                }
+                },
+                include_score=True
             ),
             expected
         )
