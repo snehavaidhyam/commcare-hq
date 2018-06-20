@@ -234,6 +234,11 @@ def build_filter_from_ast(domain, node):
 
 
 def build_filter_from_xpath(domain, xpath):
+    error_message = _(
+        "We didn't understand what you were trying to do with {}. "
+        "Please try reformatting your query. "
+        "The operators we accept are: {}"
+    )
     try:
         return build_filter_from_ast(domain, parse_xpath(xpath))
     except TypeError as e:
