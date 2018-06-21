@@ -1,7 +1,10 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
+
+import uuid
 from datetime import datetime, timedelta
 from django.test import TestCase, SimpleTestCase
+from mock import Mock
 
 from corehq.apps.domain.shortcuts import create_domain
 from corehq.apps.users.models import CommCareUser, DeviceAppMeta
@@ -55,6 +58,21 @@ class UserModelTest(TestCase):
         CommCareUser.bulk_save([self.user])
         user = CommCareUser.get(self.user._id)
         self.assertGreater(user.last_modified, lm)
+
+    def test_get_by_username(self):
+        mock_db = Mock(wraps=CommCareUser.get_db())
+        CommCareUser.set_db(mock_db)
+        random_username = uuid.uuid4().hex
+        CommCareUser.get_by_username(random_username)
+        mock_db.view.assert_called()
+
+        mock_db.reset_mock()
+        CommCareUser.get_by_username(random_username)
+        mock_db.view.assert_not_called()
+
+        mock_db.reset_mock()
+        CommCareUser.get_by_username(random_username, strict=True)
+        mock_db.view.assert_called()
 
 
 class UserDeviceTest(SimpleTestCase):
