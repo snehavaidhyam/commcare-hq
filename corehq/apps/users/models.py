@@ -1340,7 +1340,7 @@ class CouchUser(Document, DjangoUserMixin, IsMemberOfMixin, UnicodeMixIn, EulaMi
 
     @classmethod
     @quickcache(['username'], skip_arg='strict')
-    def get_by_username(cls, username, strict=True):
+    def get_by_username(cls, username, strict=False):
         if not username:
             return None
 
