@@ -1,7 +1,10 @@
 from __future__ import absolute_import, unicode_literals
 
+import six
+from django.http import HttpResponse
 from django.utils.html import escape
 from django.utils.translation import ugettext_lazy as _
+from six.moves import range
 
 from corehq.apps.case_search.const import (
     CASE_COMPUTED_METADATA,
@@ -22,11 +25,48 @@ from corehq.apps.reports.standard.cases.filters import (
     CaseListExplorerColumns,
     XpathCaseSearchFilter,
 )
-from six.moves import range
+from corehq.apps.reports.tasks import export_all_rows_with_progress
 from corehq.elastic import iter_es_docs_from_query
+from dimagi.utils.web import json_response
+from soil import DownloadBase
 
 
-class CaseListExplorer(CaseListReport):
+class ExportProgressMixin(object):
+    exportable = True
+    exportable_all = True
+    exportable_async = True
+
+    progress_observer = None
+
+    @property
+    def export_response(self):
+        task = export_all_rows_with_progress.delay(self.__class__, self.__getstate__())
+        self.export_download_data.set_task(task)
+        self.export_download_data.save()
+        return HttpResponse()
+
+    @property
+    def export_download_data(self):
+        download_data = DownloadBase.get(self.export_progress_key)
+        if download_data is None:
+            download_data = DownloadBase(download_id=self.export_progress_key)
+        return download_data
+
+    @property
+    def export_progress_key(self):
+        """Return a unique key for each "view" of the report
+        """
+        request_params = [
+            (k, tuple(v) if isinstance(v, list) else v) for k, v in six.iteritems(self.request_params)
+        ]
+        download_id = "case_list_explorer.{domain}.{state}".format(
+            domain=self.domain,
+            state=hash(tuple(sorted(request_params)))
+        )
+        return download_id
+
+
+class CaseListExplorer(ExportProgressMixin, CaseListReport):
     name = _('Case List Explorer')
     slug = 'case_list_explorer'
     search_class = CaseSearchES
@@ -127,23 +167,34 @@ class CaseListExplorer(CaseListReport):
 
     @property
     def rows(self):
-        data = (flatten_result(row) for row in self.es_results['hits'].get('hits', []))
+        data = self.es_results['hits'].get('hits', [])
         return self._get_rows(data)
 
     @property
     def get_all_rows(self):
-        data = (flatten_result(r) for r in iter_es_docs_from_query(self._build_query(sort=False)))
-        return self._get_rows(data)
+        data = iter_es_docs_from_query(self._build_query(sort=False))
+        return self._get_rows(data, update_progress=True)
 
-    def _get_rows(self, data):
-        for case in data:
+    def _get_rows(self, data, update_progress=False):
+        count = 0
+        if update_progress:
+            DownloadBase.set_progress(self.progress_observer, count, data.count)
+        for case in (flatten_result(row) for row in data):
             case_display = SafeCaseDisplay(self, case)
-            yield [
+            row = [
                 case_display.get(column.prop_name)
                 for column in self.columns
             ]
+            count += 1
+            if update_progress:
+                DownloadBase.set_progress(self.progress_observer, count, data.count)
+            yield row
 
     @property
     def export_table(self):
         self._is_exporting = True
         return super(CaseListExplorer, self).export_table
+
+
+def get_export_progress(request, domain, download_id):
+    return json_response(DownloadBase.get(download_id).get_progress())

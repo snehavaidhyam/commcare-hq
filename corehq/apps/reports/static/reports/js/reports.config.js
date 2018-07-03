@@ -15,6 +15,7 @@ var HQReport = function(options) {
     self.emailReportModal = options.emailReportModal || "#email-report-modal";
     self.isExportable = options.isExportable || false;
     self.isExportAll = options.isExportAll || false;
+    self.exportProgressKey = options.exportProgressKey || false;
     self.isEmailable = options.isEmailable || false;
     self.emailDefaultSubject = options.emailDefaultSubject || "";
     self.emailSuccessMessage = options.emailSuccessMessage;
@@ -59,6 +60,10 @@ var HQReport = function(options) {
                                         "address defined in your account settings."), "success");
                                 },
                             });
+                            if (self.exportProgressKey){
+                                $("#export-report-progress").removeClass('hide');
+                                self.pollExportProgress();
+                            }
                         } else {
                             window.location.href = self.getReportRenderUrl("export");
                         }
@@ -76,6 +81,24 @@ var HQReport = function(options) {
                 });
 
                 trackReportPageEnter();
+            }
+        });
+    };
+
+    self.pollExportProgress = function(){
+        $.ajax({
+            url: self.urlRoot + "export/progress/" + self.exportProgressKey + "/",
+            success: function(data){
+                var text = "0%";
+                if (data.current > 0) {
+                    text = data.current + "/" + data.total;
+                }
+                $("#export-report-progress")
+                    .find('.progress-bar')
+                    .css("width", data.percent + "%")
+                    .css("min-width", text.length + "em")
+                    .text(text);
+                setTimeout(self.pollExportProgress, 2000);
             }
         });
     };

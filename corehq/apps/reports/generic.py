@@ -109,6 +109,7 @@ class GenericReportView(object):
 
     exportable = False
     exportable_all = False  # also requires overriding self.get_all_rows
+    exportable_async = False
     mobile_enabled = False
     export_format_override = None
     icon = None
@@ -469,6 +470,7 @@ class GenericReportView(object):
                 url_root=self.url_root,
                 is_async=self.asynchronous,
                 is_exportable=self.exportable,
+                exportable_async=self.exportable_async,
                 dispatcher=self.dispatcher,
                 filter_set=self.filter_set,
                 needs_filters=self.needs_filters,
@@ -512,6 +514,7 @@ class GenericReportView(object):
             'filterSet': self.filter_set,
             'isEmailable': self.emailable,
             'isExportAll': self.exportable_all,
+            'exportProgressKey': self.export_progress_key if self.exportable_all else None,
             'isExportable': self.exportable,
             'needsFilters': self.needs_filters,
             'slug': self.slug,

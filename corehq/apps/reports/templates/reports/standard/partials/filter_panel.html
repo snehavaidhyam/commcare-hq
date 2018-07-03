@@ -50,6 +50,11 @@
                             {% trans "Export to" %} {% if report.export_target %}{{ report.export_target }}{% else %}Excel{% endif %}
                         </a>
                     {% endif %}
+                    {% if report.exportable_async %}
+                        <div class="progress hide" id="export-report-progress">
+                            <div class="progress-bar progress-bar-striped active" role="progressbar" style="width: 0%; min-width: 2em;"></div>
+                        </div>
+                    {% endif %}
                 {% endblock %}
                 {% if report.is_emailable %}
                     <a href="#email-report-modal" class="btn btn-default{% if report.needs_filters %} hide{% endif %}" data-toggle="modal" id="email-report">

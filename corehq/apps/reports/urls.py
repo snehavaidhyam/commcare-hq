@@ -6,6 +6,7 @@ from django.conf.urls import include, url
 from django.core.exceptions import ImproperlyConfigured
 
 from corehq.apps.reports.standard.forms.reports import ReprocessXFormErrorView
+from corehq.apps.reports.standard.cases.case_list_explorer import get_export_progress
 from corehq.apps.userreports.reports.view import (
     ConfigurableReportView,
     CustomConfigurableReportDispatcher,
@@ -146,6 +147,7 @@ urlpatterns = [
         name="hq_download_saved_export"),
     url(r"^export/saved/download/deid/(?P<export_id>[\w\-]+)/$", hq_deid_download_saved_export,
         name="hq_deid_download_saved_export"),
+    url(r"^export/progress/(?P<download_id>[\w\-\.\_]+)/$", get_export_progress, name="get_export_progress"),
 
     # Full Excel export
     url(r'^full_excel_export/(?P<export_hash>[\w\-]+)/(?P<format>[\w\-]+)$', export_report, name="export_report"),
