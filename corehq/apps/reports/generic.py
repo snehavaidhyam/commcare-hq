@@ -1128,6 +1128,7 @@ class GenericTabularReport(GenericReportView):
                         'width': report_table['left_col']['fixed']['width'],
                     } if report_table['left_col']['is_fixed'] else {},
                 },
+                'exportProgressKey': self.export_progress_key if self.exportable_all else None,
             },
         })
         for provider_function in self.extra_context_providers:

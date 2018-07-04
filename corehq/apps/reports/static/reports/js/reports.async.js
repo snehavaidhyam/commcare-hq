@@ -124,6 +124,7 @@ var HQAsyncReport = function (o) {
                 self.hqLoading.fadeOut();
 
                 if (!initial_load || !self.standardReport.needsFilters) {
+                    self.standardReport.exportProgressKey = data.report_table_js_options.exportProgressKey;
                     self.standardReport.filterSubmitButton
                         .button('reset');
                     setTimeout(function () {

@@ -56,8 +56,10 @@ class ExportProgressMixin(object):
     def export_progress_key(self):
         """Return a unique key for each "view" of the report
         """
+        report_slugs = [field.slug for field in self.fields]
         request_params = [
             (k, tuple(v) if isinstance(v, list) else v) for k, v in six.iteritems(self.request_params)
+            if k in report_slugs
         ]
         download_id = "case_list_explorer.{domain}.{state}".format(
             domain=self.domain,
