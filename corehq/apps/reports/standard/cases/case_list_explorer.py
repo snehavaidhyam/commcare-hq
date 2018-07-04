@@ -27,6 +27,7 @@ from corehq.apps.reports.standard.cases.filters import (
 )
 from corehq.apps.reports.tasks import export_all_rows_with_progress
 from corehq.elastic import iter_es_docs_from_query
+from corehq.util.view_utils import absolute_reverse
 from dimagi.utils.web import json_response
 from soil import DownloadBase
 
@@ -61,7 +62,7 @@ class ExportProgressMixin(object):
             (k, tuple(v) if isinstance(v, list) else v) for k, v in six.iteritems(self.request_params)
             if k in report_slugs
         ]
-        download_id = "case_list_explorer.{domain}.{state}".format(
+        download_id = "case-list-explorer-{domain}-{state}".format(
             domain=self.domain,
             state=hash(tuple(sorted(request_params)))
         )
@@ -199,4 +200,19 @@ class CaseListExplorer(ExportProgressMixin, CaseListReport):
 
 
 def get_export_progress(request, domain, download_id):
-    return json_response(DownloadBase.get(download_id).get_progress())
+    download = DownloadBase.get(download_id)
+    if not download:
+        return json_response({'state': 'starting'})
+
+    if download.task.successful():
+        export_id = "{}-export-result".format(download_id)
+        return json_response(
+            {
+                'state': 'success',
+                'link': absolute_reverse("export_report", args=[domain, export_id, 'xlsx'])
+            }
+        )
+    else:
+        response = {'state': 'pending'}
+        response.update(download.get_progress())
+        return json_response(response)

@@ -61,7 +61,6 @@ var HQReport = function(options) {
                                 },
                             });
                             if (self.exportProgressKey){
-                                $("#export-report-progress").removeClass('hide');
                                 self.pollExportProgress();
                             }
                         } else {
@@ -89,16 +88,50 @@ var HQReport = function(options) {
         $.ajax({
             url: self.urlRoot + "export/progress/" + self.exportProgressKey + "/",
             success: function(data){
-                var text = "0%";
-                if (data.current > 0) {
-                    text = data.current + "/" + data.total;
+                $(self.exportReportButton).hide();
+                $("#export-report-link")
+                    .removeClass('hide')
+                    .attr('href', data.link)
+                    .disableButtonNoSpinner();
+
+                if (data.state == 'pending'){
+                    var text = "0%";
+                    if (data.current > 0) {
+                        text = data.current + "/" + data.total;
+                    }
+                    $("#export-report-progress")
+                        .removeClass('hide')
+                        .find('.progress-bar')
+                        .removeClass('progress-bar-warning')
+                        .css("width", data.percent || 0 + "%")
+                        .css("min-width", text.length + "em")
+                        .text(text);
+                    $("#export-report-link").attr('href', data.link);
+                    setTimeout(self.pollExportProgress, 2000);
                 }
-                $("#export-report-progress")
-                    .find('.progress-bar')
-                    .css("width", data.percent + "%")
-                    .css("min-width", text.length + "em")
-                    .text(text);
-                setTimeout(self.pollExportProgress, 2000);
+                else if (data.state == 'starting'){
+                    $("#export-report-progress")
+                        .removeClass('hide')
+                        .find('.progress-bar')
+                        .addClass('progress-bar-warning')
+                        .css("width", data.percent || 0 + "%")
+                        .text(gettext("Collecting Data..."));
+                    setTimeout(self.pollExportProgress, 2000);
+                }
+                else if (data.state == 'success'){
+                    $("#export-report-progress")
+                        .removeClass('hide')
+                        .find('.progress-bar')
+                        .removeClass('active progress-bar-warning progress-bar-striped')
+                        .addClass('progress-bar-success')
+                        .css("width", "100%")
+                        .text(gettext("Complete"));
+                    $("#export-report-link")
+                        .removeClass('hide')
+                        .addClass('btn-success')
+                        .attr('href', data.link)
+                        .enableButton();
+                }
             }
         });
     };
