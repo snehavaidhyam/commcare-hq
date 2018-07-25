@@ -111,6 +111,15 @@
     </div>
 </div>
 {% block posttable %}{% endblock posttable %}
+
+{% if request|toggle_enabled:"EJS_CUSTOM_REPORTS" %}
+    {% for chart in charts %}
+        {% with id=forloop.counter|stringformat:"s" slug=report.slug %}
+            {% include chart.template_partial with chart=chart chart_id='chart_'|add:slug|add:'_'|add:id %}
+        {% endwith %}
+    {% endfor %}
+{% endif %}
+
 {% endblock reportcontent %}
 
 {% block js-inline %} {{ block.super }}
@@ -173,9 +182,11 @@
             });
         });
     </script>
-    {% for chart in charts %}
-        {% with id=forloop.counter|stringformat:"s" slug=report.slug %}
-            {% include chart.template_partial with chart=chart chart_id='chart_'|add:slug|add:'_'|add:id %}
-        {% endwith %}
-    {% endfor %}
+    {% if not request|toggle_enabled:"EJS_CUSTOM_REPORTS" %}
+        {% for chart in charts %}
+            {% with id=forloop.counter|stringformat:"s" slug=report.slug %}
+                {% include chart.template_partial with chart=chart chart_id='chart_'|add:slug|add:'_'|add:id %}
+            {% endwith %}
+        {% endfor %}
+    {% endif %}
 {% endblock js-inline %}
