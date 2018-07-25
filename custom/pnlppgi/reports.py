@@ -36,6 +36,7 @@ class SiteReportingRatesReport(SqlTabularReport, CustomProjectReport, ProjectRep
     is_public = True
 
     report_template_path = 'pnlppgi/site_reporting.html'
+    base_template = 'pnlppgi/base_template.html'
 
     @use_nvd3
     def decorator_dispatcher(self, request, *args, **kwargs):
