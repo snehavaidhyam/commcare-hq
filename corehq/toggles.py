@@ -501,6 +501,13 @@ DHIS2_INTEGRATION = StaticToggle(
     [NAMESPACE_DOMAIN]
 )
 
+EJS_CUSTOM_REPORTS = StaticToggle(
+    'ejs_custom_reports',
+    'Use externalized javascript on select custom reports',
+    TAG_INTERNAL,
+    [NAMESPACE_USER],
+)
+
 GRAPH_CREATION = StaticToggle(
     'graph-creation',
     'Case list/detail graph creation',
