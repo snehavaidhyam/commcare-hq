@@ -118,7 +118,11 @@ def setUpModule():
                 table_name = FILE_NAME_TO_TABLE_MAPPING[file_name[:-4]]
                 table = metadata.tables[table_name]
                 if not table_name.startswith('icds_dashboard_'):
-                    postgres_copy.copy_from(f, table, engine, format=b'csv', null=b'', header=True)
+                    columns = [
+                        '"{}"'.format(c.strip())  # quote to preserve case
+                        for c in f.readline().split(',')
+                    ]
+                    postgres_copy.copy_from(f, table, engine, format=b'csv', null=b'', columns=columns)
 
         _aggregate_child_health_pnc_forms('st1', datetime(2017, 3, 31))
         _aggregate_gm_forms('st1', datetime(2017, 3, 31))
