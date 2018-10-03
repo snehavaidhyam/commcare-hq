@@ -49,6 +49,23 @@
         }
       },
       {
+        "display_name": "Supervisor ID",
+        "datatype": "string",
+        "type": "expression",
+        "transform": {},
+        "is_nullable": true,
+        "is_primary_key": false,
+        "create_index": true,
+        "column_id": "supervisor_id",
+        "expression": {
+          "location_id_expression": {
+            "type": "named",
+            "name": "user_location_id"
+          },
+          "type": "location_parent_id"
+        }
+      },
+      {
         "column_id": "state_id",
         "datatype": "string",
         "type": "expression",
@@ -61,19 +78,8 @@
           "argument_expression": {
             "type": "ancestor_location",
             "location_id": {
-              "type": "icds_user_location",
-              "user_id_expression": {
-                "expression": {
-                  "datatype": null,
-                  "type": "property_path",
-                  "property_path": [
-                    "form",
-                    "meta",
-                    "userID"
-                  ]
-                },
-                "type": "root_doc"
-              }
+              "type": "named",
+              "name": "user_location_id"
             },
             "location_type": "state"
           }
@@ -270,6 +276,20 @@
         "value_expression": {
           "type": "property_path",
           "property_path": ["filter", "deworming", "deworming"]
+        }
+      },
+      "user_location_id": {
+        "type": "icds_user_location",
+        "user_id_expression": {
+          "type": "root_doc",
+          "expression": {
+            "type": "property_path",
+            "property_path": [
+              "form",
+              "meta",
+              "userID"
+            ]
+          }
         }
       }
     },

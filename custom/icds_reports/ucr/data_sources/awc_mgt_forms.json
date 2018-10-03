@@ -48,6 +48,23 @@
         "column_id": "user_id"
       },
       {
+        "display_name": "Supervisor ID",
+        "datatype": "string",
+        "type": "expression",
+        "transform": {},
+        "is_nullable": true,
+        "is_primary_key": false,
+        "create_index": true,
+        "column_id": "supervisor_id",
+        "expression": {
+          "location_id_expression": {
+            "type": "named",
+            "name": "user_location_id"
+          },
+          "type": "location_parent_id"
+        }
+      },
+      {
         "display_name": "",
         "datatype": "string",
         "type": "expression",
