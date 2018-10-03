@@ -212,7 +212,7 @@ class ErrorRaisingIndicatorSqlAdapter(IndicatorSqlAdapter):
 
 
 def get_indicator_table(indicator_config, custom_metadata=None):
-    sql_columns = [column_to_sql(col) for col in indicator_config.get_columns()]
+    sql_columns = [column_to_sql(col) for col in _sort_columns(indicator_config.get_columns())]
     table_name = get_table_name(indicator_config.domain, indicator_config.table_id)
     columns_by_col_id = {col.database_column_name for col in indicator_config.get_columns()}
     extra_indices = []
@@ -235,6 +235,16 @@ def get_indicator_table(indicator_config, custom_metadata=None):
         extend_existing=True,
         *columns_and_indices
     )
+
+
+def _sort_columns(columns):
+    """Sort columns so that primary keys are first (ordered by the primary_key_order field)"""
+    def _column_sort_order(v):
+        index, col = v
+        if col.is_primary_key:
+            index = 0
+        return (index, col.primary_key_order)
+    return [item[1] for item in sorted(enumerate(columns), key=_column_sort_order)]
 
 
 def _custom_index_name(table_name, column_ids):

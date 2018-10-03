@@ -2,7 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 from corehq.apps.userreports.datatypes import DataTypeProperty
-from dimagi.ext.jsonobject import JsonObject, StringProperty, ListProperty, BooleanProperty, DictProperty
+from dimagi.ext.jsonobject import JsonObject, StringProperty, ListProperty, BooleanProperty, DictProperty, IntegerProperty
 from jsonobject import DefaultProperty
 from jsonobject.exceptions import BadValueError
 from corehq.apps.userreports.expressions.getters import TransformedGetter, getter_from_property_reference, \
@@ -74,6 +74,7 @@ class RawIndicatorSpec(PropertyReferenceIndicatorSpecBase):
     datatype = DataTypeProperty(required=True)
     is_nullable = BooleanProperty(default=True)
     is_primary_key = BooleanProperty(default=False)
+    primary_key_order = IntegerProperty(default=99)
     create_index = BooleanProperty(default=False)
 
     @property
@@ -88,6 +89,7 @@ class ExpressionIndicatorSpec(IndicatorSpecBase):
     datatype = DataTypeProperty(required=True)
     is_nullable = BooleanProperty(default=True)
     is_primary_key = BooleanProperty(default=False)
+    primary_key_order = IntegerProperty(default=99)
     create_index = BooleanProperty(default=False)
     expression = DefaultProperty(required=True)
     transform = DictProperty(required=False)

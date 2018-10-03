@@ -44,6 +44,7 @@ def _build_raw_indicator(spec, context):
         datatype=wrapped.datatype,
         is_nullable=wrapped.is_nullable,
         is_primary_key=wrapped.is_primary_key,
+        primary_key_order=wrapped.primary_key_order,
         create_index=wrapped.create_index,
     )
     return RawIndicator(
@@ -61,6 +62,7 @@ def _build_expression_indicator(spec, context):
         datatype=wrapped.datatype,
         is_nullable=wrapped.is_nullable,
         is_primary_key=wrapped.is_primary_key,
+        primary_key_order=wrapped.primary_key_order,
         create_index=wrapped.create_index,
     )
     return RawIndicator(
@@ -134,6 +136,7 @@ def _build_repeat_iteration_indicator(spec, context):
             datatype="integer",
             is_nullable=False,
             is_primary_key=True,
+            primary_key_order=1
         ),
         getter=lambda doc, ctx: ctx.iteration,
         wrapped_spec=None,

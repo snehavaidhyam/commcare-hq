@@ -300,6 +300,7 @@ class DataSourceConfiguration(UnicodeMixIn, CachedCouchDocumentMixin, Document, 
             "datatype": "string",
             "is_nullable": False,
             "is_primary_key": True,
+            "primary_key_order": 0,
             "expression": {
                 "type": "root_doc",
                 "expression": {

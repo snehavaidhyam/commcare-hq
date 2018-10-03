@@ -56,9 +56,10 @@
         "type": "expression",
         "transform": {},
         "is_nullable": true,
-        "is_primary_key": false,
+        "is_primary_key": true,
+        "primary_key_order": -1,
         "column_id": "supervisor_id",
-        "create_index": true,
+        "create_index": false,
         "expression": {
           "location_id_expression": {
             "type": "named",

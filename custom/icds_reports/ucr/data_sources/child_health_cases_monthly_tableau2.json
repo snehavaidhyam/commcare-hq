@@ -246,7 +246,8 @@
           "type": "location_parent_id"
         },
         "is_nullable": true,
-        "is_primary_key": false,
+        "is_primary_key": true,
+        "primary_key_order": -1,
         "transform": {},
         "type": "expression"
       },
