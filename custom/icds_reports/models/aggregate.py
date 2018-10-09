@@ -657,6 +657,7 @@ class AggregateComplementaryFeedingForms(models.Model):
 
     # primary key as it's unique for every partition
     case_id = models.CharField(max_length=40, primary_key=True)
+    supervisor_id = models.CharField(max_length=40, primary_key=True)
 
     latest_time_end_processed = models.DateTimeField(
         help_text="The latest form.meta.timeEnd that has been processed for this case"
@@ -741,6 +742,7 @@ class AggregateChildHealthPostnatalCareForms(models.Model):
 
     # primary key as it's unique for every partition
     case_id = models.CharField(max_length=40, primary_key=True)
+    supervisor_id = models.CharField(max_length=40, primary_key=True)
 
     latest_time_end_processed = models.DateTimeField(
         help_text="The latest form.meta.timeEnd that has been processed for this case"
@@ -839,6 +841,7 @@ class AggregateCcsRecordPostnatalCareForms(models.Model):
 
     # primary key as it's unique for every partition
     case_id = models.CharField(max_length=40, primary_key=True)
+    supervisor_id = models.CharField(max_length=40, primary_key=True)
 
     latest_time_end_processed = models.DateTimeField(
         help_text="The latest form.meta.timeEnd that has been processed for this case"
@@ -889,6 +892,7 @@ class AggregateChildHealthTHRForms(models.Model):
 
     # primary key as it's unique for every partition
     case_id = models.CharField(max_length=40, primary_key=True)
+    supervisor_id = models.CharField(max_length=40, primary_key=True)
 
     latest_time_end_processed = models.DateTimeField(
         help_text="The latest form.meta.timeEnd that has been processed for this case"
@@ -929,6 +933,7 @@ class AggregateCcsRecordTHRForms(models.Model):
 
     # primary key as it's unique for every partition
     case_id = models.CharField(max_length=40, primary_key=True)
+    supervisor_id = models.CharField(max_length=40, primary_key=True)
 
     latest_time_end_processed = models.DateTimeField(
         help_text="The latest form.meta.timeEnd that has been processed for this case"
@@ -969,6 +974,7 @@ class AggregateGrowthMonitoringForms(models.Model):
 
     # primary key as it's unique for every partition
     case_id = models.CharField(max_length=40, primary_key=True)
+    supervisor_id = models.CharField(max_length=40, primary_key=True)
 
     latest_time_end_processed = models.DateTimeField(
         help_text="The latest form.meta.timeEnd that has been processed for this case"
@@ -1051,6 +1057,7 @@ class AggregateBirthPreparednesForms(models.Model):
 
     # primary key as it's unique for every partition
     case_id = models.CharField(max_length=40, primary_key=True)
+    supervisor_id = models.CharField(max_length=40, primary_key=True)
 
     latest_time_end_processed = models.DateTimeField(
         help_text="The latest form.meta.timeEnd that has been processed for this case"
@@ -1163,6 +1170,7 @@ class AggregateCcsRecordDeliveryForms(models.Model):
 
     # primary key as it's unique for every partition
     case_id = models.CharField(max_length=40, primary_key=True)
+    supervisor_id = models.CharField(max_length=40, primary_key=True)
 
     latest_time_end_processed = models.DateTimeField(
         help_text="The latest form.meta.timeEnd that has been processed for this case"
@@ -1246,6 +1254,7 @@ class AggregateChildHealthDailyFeedingForms(models.Model):
 
     # primary key as it's unique for every partition
     case_id = models.CharField(max_length=40, primary_key=True)
+    supervisor_id = models.CharField(max_length=40, primary_key=True)
 
     latest_time_end_processed = models.DateTimeField(
         help_text="The latest form.meta.timeEnd that has been processed for this case"
@@ -1285,6 +1294,7 @@ class AggregateAwcInfrastructureForms(models.Model):
 
     # primary key as it's unique for every partition
     awc_id = models.CharField(max_length=40, primary_key=True)
+    supervisor_id = models.CharField(max_length=40, primary_key=True)
 
     latest_time_end_processed = models.DateTimeField(
         help_text="The latest form.meta.timeEnd that has been processed for this case"

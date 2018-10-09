@@ -139,6 +139,7 @@ class ComplementaryFormsAggregationHelper(BaseICDSAggregationHelper):
 
         return """
         SELECT DISTINCT child_health_case_id AS case_id,
+        LAST_VALUE(supervisor_id) OVER w AS supervisor_id,
         LAST_VALUE(timeend) OVER w AS latest_time_end,
         MAX(play_comp_feeding_vid) OVER w AS play_comp_feeding_vid,
         MAX(comp_feeding) OVER w AS comp_feeding_ever,
@@ -180,7 +181,7 @@ class ComplementaryFormsAggregationHelper(BaseICDSAggregationHelper):
         # and we want NULL in the aggregate table
         return """
         INSERT INTO "{tablename}" (
-          state_id, month, case_id, latest_time_end_processed, comp_feeding_ever,
+          state_id, month, case_id, supervisor_id, latest_time_end_processed, comp_feeding_ever,
           demo_comp_feeding, counselled_pediatric_ifa, play_comp_feeding_vid,
           comp_feeding_latest, diet_diversity, diet_quantity, hand_wash
         ) (
@@ -188,6 +189,7 @@ class ComplementaryFormsAggregationHelper(BaseICDSAggregationHelper):
             %(state_id)s AS state_id,
             %(month)s AS month,
             COALESCE(ucr.case_id, prev_month.case_id) AS case_id,
+            COALESCE(ucr.supervisor_id, prev_month.supervisor_id) AS supervisor_id,
             GREATEST(ucr.latest_time_end, prev_month.latest_time_end_processed) AS latest_time_end_processed,
             GREATEST(ucr.comp_feeding_ever, prev_month.comp_feeding_ever) AS comp_feeding_ever,
             GREATEST(ucr.demo_comp_feeding, prev_month.demo_comp_feeding) AS demo_comp_feeding,
@@ -263,6 +265,7 @@ class PostnatalCareFormsChildHealthAggregationHelper(BaseICDSAggregationHelper):
 
         return """
         SELECT DISTINCT child_health_case_id AS case_id,
+        LAST_VALUE(supervisor_id) OVER w as supervisor_id,
         LAST_VALUE(timeend) OVER w AS latest_time_end,
         MAX(counsel_increase_food_bf) OVER w AS counsel_increase_food_bf,
         MAX(counsel_breast) OVER w AS counsel_breast,
@@ -282,7 +285,7 @@ class PostnatalCareFormsChildHealthAggregationHelper(BaseICDSAggregationHelper):
               state_id = %(state_id)s AND
               child_health_case_id IS NOT NULL
         WINDOW w AS (
-            PARTITION BY child_health_case_id
+            PARTITION BY supervisor_id, child_health_case_id
             ORDER BY timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
         )
         """.format(ucr_tablename=self.ucr_tablename), {
@@ -305,7 +308,7 @@ class PostnatalCareFormsChildHealthAggregationHelper(BaseICDSAggregationHelper):
 
         return """
         INSERT INTO "{tablename}" (
-          state_id, month, case_id, latest_time_end_processed, counsel_increase_food_bf,
+          state_id, month, case_id, supervisor_id, latest_time_end_processed, counsel_increase_food_bf,
           counsel_breast, skin_to_skin, is_ebf, water_or_milk, other_milk_to_child,
           tea_other, eating, counsel_exclusive_bf, counsel_only_milk, counsel_adequate_bf,
           not_breastfeeding
@@ -314,6 +317,7 @@ class PostnatalCareFormsChildHealthAggregationHelper(BaseICDSAggregationHelper):
             %(state_id)s AS state_id,
             %(month)s AS month,
             COALESCE(ucr.case_id, prev_month.case_id) AS case_id,
+            COALESCE(ucr.supervisor_id, prev_month.supervisor_id) AS supervisor_id,
             GREATEST(ucr.latest_time_end, prev_month.latest_time_end_processed) AS latest_time_end_processed,
             GREATEST(ucr.counsel_increase_food_bf, prev_month.counsel_increase_food_bf) AS counsel_increase_food_bf,
             GREATEST(ucr.counsel_breast, prev_month.counsel_breast) AS counsel_breast,
@@ -390,13 +394,14 @@ class PostnatalCareFormsCcsRecordAggregationHelper(BaseICDSAggregationHelper):
 
         return """
         SELECT DISTINCT ccs_record_case_id AS case_id,
+        LAST_VALUE(supervisor_id) OVER w AS supervisor_id,
         LAST_VALUE(timeend) OVER w AS latest_time_end,
         MAX(counsel_methods) OVER w AS counsel_methods,
         LAST_VALUE(is_ebf) OVER w as is_ebf
         FROM "{ucr_tablename}"
         WHERE timeend >= %(current_month_start)s AND timeend < %(next_month_start)s AND state_id = %(state_id)s
         WINDOW w AS (
-            PARTITION BY ccs_record_case_id
+            PARTITION BY supervisor_id, ccs_record_case_id
             ORDER BY timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
         )
         """.format(ucr_tablename=self.ucr_tablename), {
@@ -419,12 +424,13 @@ class PostnatalCareFormsCcsRecordAggregationHelper(BaseICDSAggregationHelper):
 
         return """
         INSERT INTO "{tablename}" (
-          state_id, month, case_id, latest_time_end_processed, counsel_methods, is_ebf
+          state_id, month, case_id, supervisor_id, latest_time_end_processed, counsel_methods, is_ebf
         ) (
           SELECT
             %(state_id)s AS state_id,
             %(month)s AS month,
             COALESCE(ucr.case_id, prev_month.case_id) AS case_id,
+            COALESCE(ucr.supervisor_id, prev_month.supervisor_id) AS supervisor_id,
             GREATEST(ucr.latest_time_end, prev_month.latest_time_end_processed) AS latest_time_end_processed,
             GREATEST(ucr.counsel_methods, prev_month.counsel_methods) AS counsel_methods,
             ucr.is_ebf as is_ebf
@@ -486,19 +492,23 @@ class THRFormsChildHealthAggregationHelper(BaseICDSAggregationHelper):
 
         return """
         INSERT INTO "{tablename}" (
-          state_id, month, case_id, latest_time_end_processed, days_ration_given_child
+          case_id, state_id, month, supervisor_id, latest_time_end_processed, days_ration_given_child
         ) (
           SELECT
+            DISTINCT child_health_case_id AS case_id,
             %(state_id)s AS state_id,
-            %(month)s AS month,
-            child_health_case_id AS case_id,
-            MAX(timeend) AS latest_time_end_processed,
-            SUM(days_ration_given_child) AS days_ration_given_child
+            %(month)s::date AS month,
+            LAST_VALUE(supervisor_id) OVER w AS supervisor_id,
+            MAX(timeend) OVER w AS latest_time_end_processed,
+            SUM(days_ration_given_child) OVER w AS days_ration_given_child
           FROM "{ucr_tablename}"
           WHERE state_id = %(state_id)s AND
                 timeend >= %(current_month_start)s AND timeend < %(next_month_start)s AND
                 child_health_case_id IS NOT NULL
-          GROUP BY child_health_case_id
+          WINDOW w AS (
+            PARTITION BY ccs_record_case_id
+            ORDER BY timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+          )
         )
         """.format(
             ucr_tablename=self.ucr_tablename,
@@ -526,19 +536,23 @@ class THRFormsCcsRecordAggregationHelper(BaseICDSAggregationHelper):
 
         return """
         INSERT INTO "{tablename}" (
-          state_id, month, case_id, latest_time_end_processed, days_ration_given_mother
+          case_id, state_id, month, supervisor_id, latest_time_end_processed, days_ration_given_mother
         ) (
           SELECT
+            DISTINCT ccs_record_case_id AS case_id,
             %(state_id)s AS state_id,
-            %(month)s AS month,
-            ccs_record_case_id AS case_id,
-            MAX(timeend) AS latest_time_end_processed,
-            SUM(days_ration_given_mother) AS days_ration_given_mother
+            %(month)s::date AS month,
+            LAST_VALUE(supervisor_id) OVER w as supervisor_id,
+            MAX(timeend) OVER w AS latest_time_end_processed,
+            SUM(days_ration_given_mother) OVER w AS days_ration_given_mother
           FROM "{ucr_tablename}"
           WHERE state_id = %(state_id)s AND
                 timeend >= %(current_month_start)s AND timeend < %(next_month_start)s AND
                 ccs_record_case_id IS NOT NULL
-          GROUP BY ccs_record_case_id
+          WINDOW w AS (
+            PARTITION BY ccs_record_case_id
+            ORDER BY timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+          )
         )
         """.format(
             ucr_tablename=self.ucr_tablename,
@@ -568,6 +582,7 @@ class GrowthMonitoringFormsAggregationHelper(BaseICDSAggregationHelper):
         return """
             SELECT
                 DISTINCT child_health_case_id AS case_id,
+                LAST_VALUE(supervisor_id) OVER weight_child AS supervisor_id,
                 LAST_VALUE(weight_child) OVER weight_child AS weight_child,
                 CASE
                     WHEN LAST_VALUE(weight_child) OVER weight_child IS NULL THEN NULL
@@ -672,7 +687,7 @@ class GrowthMonitoringFormsAggregationHelper(BaseICDSAggregationHelper):
         # but an unexpected NULL should not block other data
         return """
         INSERT INTO "{tablename}" (
-            state_id, month, case_id, latest_time_end_processed,
+            state_id, month, case_id, supervisor_id, latest_time_end_processed,
             weight_child, weight_child_last_recorded,
             height_child, height_child_last_recorded,
             zscore_grading_wfa, zscore_grading_wfa_last_recorded,
@@ -684,6 +699,7 @@ class GrowthMonitoringFormsAggregationHelper(BaseICDSAggregationHelper):
             %(state_id)s AS state_id,
             %(month)s AS month,
             COALESCE(ucr.case_id, prev_month.case_id) AS case_id,
+            COALESCE(ucr.supervisor_id, prev_month.supervisor_id) AS supervisor_id,
             GREATEST(
                 ucr.weight_child_last_recorded,
                 ucr.height_child_last_recorded,
@@ -759,6 +775,7 @@ class BirthPreparednessFormsAggregationHelper(BaseICDSAggregationHelper):
 
         return """
         SELECT DISTINCT ccs_record_case_id AS case_id,
+        LAST_VALUE(supervisor_id) OVER w AS supervisor_id,
         LAST_VALUE(timeend) OVER w AS latest_time_end,
         MAX(immediate_breastfeeding) OVER w AS immediate_breastfeeding,
         LAST_VALUE(eating_extra) OVER w as eating_extra,
@@ -801,7 +818,7 @@ class BirthPreparednessFormsAggregationHelper(BaseICDSAggregationHelper):
 
         return """
         INSERT INTO "{tablename}" (
-          state_id, month, case_id, latest_time_end_processed,
+          state_id, month, case_id, supervisor_id, latest_time_end_processed,
           immediate_breastfeeding, anemia, eating_extra, resting,
           anc_weight, anc_blood_pressure, bp_sys, bp_dia, anc_hemoglobin, 
           bleeding, swelling, blurred_vision, convulsions, rupture, anc_abnormalities
@@ -810,6 +827,7 @@ class BirthPreparednessFormsAggregationHelper(BaseICDSAggregationHelper):
             %(state_id)s AS state_id,
             %(month)s AS month,
             ucr.case_id AS case_id,
+            ucr.supervisor_id AS supervisor_id,
             ucr.latest_time_end AS latest_time_end_processed,
             GREATEST(ucr.immediate_breastfeeding, prev_month.immediate_breastfeeding) AS immediate_breastfeeding,
             ucr.anemia AS anemia,
@@ -885,12 +903,13 @@ class DeliveryFormsAggregationHelper(BaseICDSAggregationHelper):
 
         return """
         INSERT INTO "{tablename}" (
-          case_id, state_id, month, latest_time_end_processed, breastfed_at_birth
+          case_id, state_id, month, supervisor_id, latest_time_end_processed, breastfed_at_birth
         ) (
           SELECT
             DISTINCT case_load_ccs_record0 AS case_id,
             %(state_id)s AS state_id,
             %(month)s::DATE AS month,
+            LAST_VALUE(supervisor_id) over w AS supervisor_id,
             LAST_VALUE(timeend) over w AS latest_time_end_processed,
             LAST_VALUE(breastfed_at_birth) over w as breastfed_at_birth
           FROM "{ucr_tablename}"
@@ -1323,19 +1342,23 @@ class DailyFeedingFormsChildHealthAggregationHelper(BaseICDSAggregationHelper):
 
         return """
         INSERT INTO "{tablename}" (
-          state_id, month, case_id, latest_time_end_processed, sum_attended_child_ids
+          case_id, state_id, month, supervisor_id, latest_time_end_processed, sum_attended_child_ids
         ) (
           SELECT
+            DISTINCT child_health_case_id AS case_id,
             %(state_id)s AS state_id,
-            %(month)s AS month,
-            child_health_case_id AS case_id,
-            MAX(timeend) AS latest_time_end_processed,
-            SUM(attended_child_ids) AS sum_attended_child_ids
+            %(month)s::date AS month,
+            LAST_VALUE(supervisor_id) OVER w AS supervisor_id,
+            MAX(timeend) OVER w AS latest_time_end_processed,
+            SUM(attended_child_ids) OVER w AS sum_attended_child_ids
           FROM "{ucr_tablename}"
           WHERE state_id = %(state_id)s AND
                 timeend >= %(current_month_start)s AND timeend < %(next_month_start)s AND
                 child_health_case_id IS NOT NULL
-          GROUP BY child_health_case_id
+          WINDOW w AS (
+            PARTITION BY child_health_case_id
+            ORDER BY timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+        )
         )
         """.format(
             ucr_tablename=self.ucr_tablename,
@@ -2005,6 +2028,7 @@ class AwcInfrastructureAggregationHelper(BaseICDSAggregationHelper):
     aggregate_parent_table = AGG_INFRASTRUCTURE_TABLE
     aggregate_child_table_prefix = 'icds_db_infra_form_'
     column_names = (
+        'supervisor_id',
         'timeend',
         'awc_building', 'source_drinking_water', 'toilet_functional',
         'electricity_awc', 'adequate_space_pse',
@@ -2069,7 +2093,7 @@ class AwcInfrastructureAggregationHelper(BaseICDSAggregationHelper):
 
         return """
         INSERT INTO "{tablename}" (
-            state_id, month, awc_id, latest_time_end_processed,
+            state_id, month, awc_id, supervisor_id, latest_time_end_processed,
             awc_building, source_drinking_water, toilet_functional,
             electricity_awc, adequate_space_pse,
             adult_scale_available, baby_scale_available, flat_scale_available,
@@ -2080,6 +2104,7 @@ class AwcInfrastructureAggregationHelper(BaseICDSAggregationHelper):
             %(state_id)s AS state_id,
             %(month)s AS month,
             ucr.awc_id AS awc_id,
+            ucr.supervisor_id AS supervisor_id,
             ucr.timeend as latest_time_end_processed,
             ucr.awc_building as awc_building,
             ucr.source_drinking_water as source_drinking_water,
