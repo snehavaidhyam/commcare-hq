@@ -12,6 +12,7 @@ import six
 from corehq.apps.locations.models import SQLLocation
 from corehq.apps.userreports.models import StaticDataSourceConfiguration, get_datasource_config
 from corehq.apps.userreports.util import get_table_name
+from corehq.util.django_migrations import add_if_not_exists_raw
 from custom.icds_reports.const import (
     AGG_COMP_FEEDING_TABLE,
     AGG_CCS_RECORD_BP_TABLE,
@@ -72,7 +73,7 @@ class BaseICDSAggregationHelper(object):
     def generate_child_tablename(self, month=None):
         month = month or self.month
         month_string = month_formatter(month)
-        hash_for_table = hashlib.md5(self.state_id + month_string).hexdigest()[8:]
+        hash_for_table = hashlib.md5(month_string).hexdigest()[8:]
         return self.aggregate_child_table_prefix + hash_for_table
 
     def create_table_query(self, month=None):
@@ -80,22 +81,26 @@ class BaseICDSAggregationHelper(object):
         month_string = month_formatter(month)
         tablename = self.generate_child_tablename(month)
 
-        return """
+        """
         CREATE TABLE IF NOT EXISTS "{child_tablename}" (
             CHECK (month = %(month_string)s AND state_id = %(state_id)s),
             LIKE "{parent_tablename}" INCLUDING DEFAULTS INCLUDING CONSTRAINTS INCLUDING INDEXES
         ) INHERITS ("{parent_tablename}")
+        """
+        return add_if_not_exists_raw("""
+        CREATE TABLE "{child_tablename}" PARTITION OF "{parent_tablename}" 
+        FOR VALUES IN (%(month_string)s)
         """.format(
             parent_tablename=self.aggregate_parent_table,
             child_tablename=tablename,
-        ), {
+        ), tablename), {
             "month_string": month_string,
-            "state_id": self.state_id
         }
 
     def drop_table_query(self):
         tablename = self.generate_child_tablename(self.month)
-        return 'DROP TABLE IF EXISTS "{tablename}"'.format(tablename=tablename)
+        # return 'DROP TABLE IF EXISTS "{tablename}"'.format(tablename=tablename)
+        return 'DELETE FROM "{tablename}" WHERE state_id = %(state_id)s'.format(tablename=tablename), {'state_id': self.state_id}
 
     def data_from_ucr_query(self):
         """Returns (SQL query, query parameters) from the UCR data table that
@@ -324,7 +329,7 @@ class PostnatalCareFormsChildHealthAggregationHelper(BaseICDSAggregationHelper):
             ucr.not_breastfeeding AS not_breastfeeding
           FROM ({ucr_table_query}) ucr
           FULL OUTER JOIN "{previous_month_tablename}" prev_month
-          ON ucr.case_id = prev_month.case_id
+          ON prev_month.state_id = %(state_id)s AND ucr.case_id = prev_month.case_id
         )
         """.format(
             ucr_table_query=ucr_query,
@@ -958,7 +963,7 @@ class ChildHealthMonthlyAggregationHelper(BaseICDSAggregationHelper):
         return "{}_{}".format(self.base_tablename, self.month.strftime("%Y-%m-%d"))
 
     def drop_table_query(self):
-        return 'DELETE FROM "{}"'.format(self.tablename)
+        return 'DELETE FROM "{}"'.format(self.tablename), {}
 
     def aggregation_query(self):
         start_month_string = self.month.strftime("'%Y-%m-%d'::date")
@@ -1358,7 +1363,7 @@ class AggChildHealthAggregationHelper(BaseICDSAggregationHelper):
         return self._tablename_func(5)
 
     def drop_table_query(self):
-        return 'DELETE FROM "{}"'.format(self.tablename)
+        return 'DELETE FROM "{}"'.format(self.tablename), {}
 
     def aggregation_query(self):
         columns = (
@@ -1648,7 +1653,7 @@ class CcsRecordMonthlyAggregationHelper(BaseICDSAggregationHelper):
         return "{}_{}".format(self.base_tablename, self.month.strftime("%Y-%m-%d"))
 
     def drop_table_query(self):
-        return 'DELETE FROM "{}"'.format(self.tablename)
+        return 'DELETE FROM "{}"'.format(self.tablename), {}
 
     def aggregation_query(self):
 
@@ -1803,7 +1808,7 @@ class AggCcsRecordAggregationHelper(BaseICDSAggregationHelper):
         return self._tablename_func(5)
 
     def drop_table_query(self):
-        return 'DELETE FROM "{}"'.format(self.tablename)
+        return 'DELETE FROM "{}"'.format(self.tablename), {}
 
     def aggregation_query(self):
 

@@ -140,7 +140,7 @@ class CcsRecordMonthly(models.Model):
 
         with get_cursor(cls) as cursor:
             with transaction.atomic():
-                cursor.execute(helper.drop_table_query())
+                cursor.execute(*helper.drop_table_query())
                 cursor.execute(agg_query, agg_params)
                 for query in index_queries:
                     cursor.execute(query)
@@ -263,7 +263,7 @@ class ChildHealthMonthly(models.Model):
 
         with get_cursor(cls) as cursor:
             with transaction.atomic():
-                cursor.execute(helper.drop_table_query())
+                cursor.execute(*helper.drop_table_query())
                 cursor.execute(agg_query, agg_params)
                 for query in index_queries:
                     cursor.execute(query)
@@ -477,7 +477,7 @@ class AggCcsRecord(models.Model):
 
         with get_cursor(cls) as cursor:
             with transaction.atomic():
-                cursor.execute(helper.drop_table_query())
+                cursor.execute(*helper.drop_table_query())
                 cursor.execute(agg_query, agg_params)
                 for query in rollup_queries:
                     cursor.execute(query)
@@ -570,7 +570,7 @@ class AggChildHealth(models.Model):
 
         with get_cursor(cls) as cursor:
             with transaction.atomic():
-                cursor.execute(helper.drop_table_query())
+                cursor.execute(*helper.drop_table_query())
                 cursor.execute(agg_query, agg_params)
                 for query in rollup_queries:
                     cursor.execute(query)
@@ -709,8 +709,8 @@ class AggregateComplementaryFeedingForms(models.Model):
 
         with get_cursor(cls) as cursor:
             cursor.execute(prev_month_query, prev_month_params)
-            cursor.execute(helper.drop_table_query())
             cursor.execute(curr_month_query, curr_month_params)
+            cursor.execute(*helper.drop_table_query())
             cursor.execute(agg_query, agg_params)
 
     @classmethod
@@ -807,8 +807,8 @@ class AggregateChildHealthPostnatalCareForms(models.Model):
 
         with get_cursor(cls) as cursor:
             cursor.execute(prev_month_query, prev_month_params)
-            cursor.execute(helper.drop_table_query())
             cursor.execute(curr_month_query, curr_month_params)
+            cursor.execute(*helper.drop_table_query())
             cursor.execute(agg_query, agg_params)
 
     @classmethod
@@ -864,8 +864,8 @@ class AggregateCcsRecordPostnatalCareForms(models.Model):
 
         with get_cursor(cls) as cursor:
             cursor.execute(prev_month_query, prev_month_params)
-            cursor.execute(helper.drop_table_query())
             cursor.execute(curr_month_query, curr_month_params)
+            cursor.execute(*helper.drop_table_query())
             cursor.execute(agg_query, agg_params)
 
     @classmethod
@@ -908,8 +908,8 @@ class AggregateChildHealthTHRForms(models.Model):
         agg_query, agg_params = helper.aggregation_query()
 
         with get_cursor(cls) as cursor:
-            cursor.execute(helper.drop_table_query())
             cursor.execute(curr_month_query, curr_month_params)
+            cursor.execute(*helper.drop_table_query())
             cursor.execute(agg_query, agg_params)
 
 
@@ -948,8 +948,8 @@ class AggregateCcsRecordTHRForms(models.Model):
         agg_query, agg_params = helper.aggregation_query()
 
         with get_cursor(cls) as cursor:
-            cursor.execute(helper.drop_table_query())
             cursor.execute(curr_month_query, curr_month_params)
+            cursor.execute(*helper.drop_table_query())
             cursor.execute(agg_query, agg_params)
 
 
@@ -1029,8 +1029,8 @@ class AggregateGrowthMonitoringForms(models.Model):
 
         with get_cursor(cls) as cursor:
             cursor.execute(prev_month_query, prev_month_params)
-            cursor.execute(helper.drop_table_query())
             cursor.execute(curr_month_query, curr_month_params)
+            cursor.execute(*helper.drop_table_query())
             cursor.execute(agg_query, agg_params)
 
     @classmethod
@@ -1132,8 +1132,8 @@ class AggregateBirthPreparednesForms(models.Model):
 
         with get_cursor(cls) as cursor:
             cursor.execute(prev_month_query, prev_month_params)
-            cursor.execute(helper.drop_table_query())
             cursor.execute(curr_month_query, curr_month_params)
+            cursor.execute(*helper.drop_table_query())
             cursor.execute(agg_query, agg_params)
 
     @classmethod
@@ -1182,8 +1182,8 @@ class AggregateCcsRecordDeliveryForms(models.Model):
         agg_query, agg_params = helper.aggregation_query()
 
         with get_cursor(cls) as cursor:
-            cursor.execute(helper.drop_table_query())
             cursor.execute(curr_month_query, curr_month_params)
+            cursor.execute(*helper.drop_table_query())
             cursor.execute(agg_query, agg_params)
 
 
@@ -1265,8 +1265,8 @@ class AggregateChildHealthDailyFeedingForms(models.Model):
         agg_query, agg_params = helper.aggregation_query()
 
         with get_cursor(cls) as cursor:
-            cursor.execute(helper.drop_table_query())
             cursor.execute(curr_month_query, curr_month_params)
+            cursor.execute(*helper.drop_table_query())
             cursor.execute(agg_query, agg_params)
 
 
@@ -1317,6 +1317,6 @@ class AggregateAwcInfrastructureForms(models.Model):
         agg_query, agg_params = helper.aggregation_query()
 
         with get_cursor(cls) as cursor:
-            cursor.execute(helper.drop_table_query())
             cursor.execute(curr_month_query, curr_month_params)
+            cursor.execute(*helper.drop_table_query())
             cursor.execute(agg_query, agg_params)
