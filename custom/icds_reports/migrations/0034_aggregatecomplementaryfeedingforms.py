@@ -13,24 +13,60 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='AggregateComplementaryFeedingForms',
-            fields=[
-                ('state_id', models.CharField(max_length=40)),
-                ('month', models.DateField(help_text=b'Will always be YYYY-MM-01')),
-                ('case_id', models.CharField(max_length=40, primary_key=True, serialize=False)),
-                ('latest_time_end_processed', models.DateTimeField(help_text=b'The latest form.meta.timeEnd that has been processed for this case')),
-                ('comp_feeding_ever', models.PositiveSmallIntegerField(help_text=b'Complementary feeding has ever occurred for this case', null=True)),
-                ('demo_comp_feeding', models.PositiveSmallIntegerField(help_text=b'Demo of complementary feeding has ever occurred', null=True)),
-                ('counselled_pediatric_ifa', models.PositiveSmallIntegerField(help_text=b'Once the child is over 1 year, has ever been counseled on pediatric IFA', null=True)),
-                ('play_comp_feeding_vid', models.PositiveSmallIntegerField(help_text=b'Case has ever been counseled about complementary feeding with a video', null=True)),
-                ('comp_feeding_latest', models.PositiveSmallIntegerField(help_text=b'Complementary feeding occurred for this case in the latest form', null=True)),
-                ('diet_diversity', models.PositiveSmallIntegerField(help_text=b'Diet diversity occurred for this case in the latest form', null=True)),
-                ('diet_quantity', models.PositiveSmallIntegerField(help_text=b'Diet quantity occurred for this case in the latest form', null=True)),
-                ('hand_wash', models.PositiveSmallIntegerField(help_text=b'Hand washing occurred for this case in the latest form', null=True)),
-            ],
-            options={
-                'db_table': 'icds_dashboard_comp_feed_form',
-            },
-        ),
+        migrations.RunSQL("""
+            CREATE TABLE public.icds_dashboard_comp_feed_form (
+                state_id character varying(40) NOT NULL,
+                month date NOT NULL,
+                case_id character varying(40) NOT NULL,
+                latest_time_end_processed timestamp with time zone NOT NULL,
+                comp_feeding_ever smallint,
+                demo_comp_feeding smallint,
+                counselled_pediatric_ifa smallint,
+                play_comp_feeding_vid smallint,
+                comp_feeding_latest smallint,
+                diet_diversity smallint,
+                diet_quantity smallint,
+                hand_wash smallint,
+                CONSTRAINT icds_dashboard_comp_feed_form_comp_feeding_ever_check CHECK ((comp_feeding_ever >= 0)),
+                CONSTRAINT icds_dashboard_comp_feed_form_comp_feeding_latest_check CHECK ((comp_feeding_latest >= 0)),
+                CONSTRAINT icds_dashboard_comp_feed_form_counselled_pediatric_ifa_check CHECK ((counselled_pediatric_ifa >= 0)),
+                CONSTRAINT icds_dashboard_comp_feed_form_demo_comp_feeding_check CHECK ((demo_comp_feeding >= 0)),
+                CONSTRAINT icds_dashboard_comp_feed_form_diet_diversity_check CHECK ((diet_diversity >= 0)),
+                CONSTRAINT icds_dashboard_comp_feed_form_diet_quantity_check CHECK ((diet_quantity >= 0)),
+                CONSTRAINT icds_dashboard_comp_feed_form_hand_wash_check CHECK ((hand_wash >= 0)),
+                CONSTRAINT icds_dashboard_comp_feed_form_play_comp_feeding_vid_check CHECK ((play_comp_feeding_vid >= 0))
+            ) PARTITION BY LIST (month)
+        """, state_operations=[
+            migrations.CreateModel(
+                name='AggregateComplementaryFeedingForms',
+                fields=[
+                    ('state_id', models.CharField(max_length=40)),
+                    ('month', models.DateField(help_text=b'Will always be YYYY-MM-01')),
+                    ('case_id', models.CharField(max_length=40, primary_key=True, serialize=False)),
+                    ('latest_time_end_processed', models.DateTimeField(
+                        help_text=b'The latest form.meta.timeEnd that has been processed for this case')),
+                    ('comp_feeding_ever', models.PositiveSmallIntegerField(
+                        help_text=b'Complementary feeding has ever occurred for this case', null=True)),
+                    ('demo_comp_feeding',
+                     models.PositiveSmallIntegerField(help_text=b'Demo of complementary feeding has ever occurred',
+                                                      null=True)),
+                    ('counselled_pediatric_ifa', models.PositiveSmallIntegerField(
+                        help_text=b'Once the child is over 1 year, has ever been counseled on pediatric IFA',
+                        null=True)),
+                    ('play_comp_feeding_vid', models.PositiveSmallIntegerField(
+                        help_text=b'Case has ever been counseled about complementary feeding with a video', null=True)),
+                    ('comp_feeding_latest', models.PositiveSmallIntegerField(
+                        help_text=b'Complementary feeding occurred for this case in the latest form', null=True)),
+                    ('diet_diversity', models.PositiveSmallIntegerField(
+                        help_text=b'Diet diversity occurred for this case in the latest form', null=True)),
+                    ('diet_quantity', models.PositiveSmallIntegerField(
+                        help_text=b'Diet quantity occurred for this case in the latest form', null=True)),
+                    ('hand_wash', models.PositiveSmallIntegerField(
+                        help_text=b'Hand washing occurred for this case in the latest form', null=True)),
+                ],
+                options={
+                    'db_table': 'icds_dashboard_comp_feed_form',
+                },
+            ),
+        ]),
     ]

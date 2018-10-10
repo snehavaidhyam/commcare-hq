@@ -14,26 +14,64 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='AggregateGrowthMonitoringForms',
-            fields=[
-                ('state_id', models.CharField(max_length=40)),
-                ('month', models.DateField(help_text='Will always be YYYY-MM-01')),
-                ('case_id', models.CharField(max_length=40, primary_key=True, serialize=False)),
-                ('latest_time_end_processed', models.DateTimeField(help_text='The latest form.meta.timeEnd that has been processed for this case')),
-                ('weight_child', models.DecimalField(decimal_places=16, help_text='Last recorded weight_child case property', max_digits=64, null=True)),
-                ('weight_child_last_recorded', models.DateTimeField(help_text='Time when weight_child was last recorded', null=True)),
-                ('height_child', models.DecimalField(decimal_places=16, help_text='Last recorded height_child case property', max_digits=64, null=True)),
-                ('height_child_last_recorded', models.DateTimeField(help_text='Time when height_child was last recorded', null=True)),
-                ('zscore_grading_wfa', models.PositiveSmallIntegerField(help_text='Last value of zscore_grading_wfa in this month', null=True)),
-                ('zscore_grading_wfa_last_recorded', models.DateTimeField(help_text='Time when zscore_grading_wfa was last recorded', null=True)),
-                ('zscore_grading_hfa', models.PositiveSmallIntegerField(help_text='Last value of zscore_grading_hfa in this month', null=True)),
-                ('zscore_grading_hfa_last_recorded', models.DateTimeField(help_text='Time when zscore_grading_hfa was last recorded', null=True)),
-                ('zscore_grading_wfh', models.PositiveSmallIntegerField(help_text='Current value of zscore_grading_wfh in this month', null=True)),
-                ('zscore_grading_wfh_last_recorded', models.DateTimeField(help_text='Time when zscore_grading_wfh was last recorded', null=True)),
-            ],
-            options={
-                'db_table': 'icds_dashboard_growth_monitoring_forms',
-            },
-        ),
+        migrations.RunSQL("""
+            CREATE TABLE public.icds_dashboard_growth_monitoring_forms (
+                state_id character varying(40) NOT NULL,
+                month date NOT NULL,
+                case_id character varying(40) NOT NULL,
+                latest_time_end_processed timestamp with time zone NOT NULL,
+                weight_child numeric(64,16),
+                weight_child_last_recorded timestamp with time zone,
+                height_child numeric(64,16),
+                height_child_last_recorded timestamp with time zone,
+                zscore_grading_wfa smallint,
+                zscore_grading_wfa_last_recorded timestamp with time zone,
+                zscore_grading_hfa smallint,
+                zscore_grading_hfa_last_recorded timestamp with time zone,
+                zscore_grading_wfh smallint,
+                zscore_grading_wfh_last_recorded timestamp with time zone,
+                CONSTRAINT icds_dashboard_growth_monitoring_forms_zscore_grading_hfa_check CHECK ((zscore_grading_hfa >= 0)),
+                CONSTRAINT icds_dashboard_growth_monitoring_forms_zscore_grading_wfa_check CHECK ((zscore_grading_wfa >= 0)),
+                CONSTRAINT icds_dashboard_growth_monitoring_forms_zscore_grading_wfh_check CHECK ((zscore_grading_wfh >= 0))
+            ) PARTITION BY LIST (month)
+        """, state_operations=[
+            migrations.CreateModel(
+                name='AggregateGrowthMonitoringForms',
+                fields=[
+                    ('state_id', models.CharField(max_length=40)),
+                    ('month', models.DateField(help_text='Will always be YYYY-MM-01')),
+                    ('case_id', models.CharField(max_length=40, primary_key=True, serialize=False)),
+                    ('latest_time_end_processed', models.DateTimeField(
+                        help_text='The latest form.meta.timeEnd that has been processed for this case')),
+                    ('weight_child',
+                     models.DecimalField(decimal_places=16, help_text='Last recorded weight_child case property',
+                                         max_digits=64, null=True)),
+                    ('weight_child_last_recorded',
+                     models.DateTimeField(help_text='Time when weight_child was last recorded', null=True)),
+                    ('height_child',
+                     models.DecimalField(decimal_places=16, help_text='Last recorded height_child case property',
+                                         max_digits=64, null=True)),
+                    ('height_child_last_recorded',
+                     models.DateTimeField(help_text='Time when height_child was last recorded', null=True)),
+                    ('zscore_grading_wfa',
+                     models.PositiveSmallIntegerField(help_text='Last value of zscore_grading_wfa in this month',
+                                                      null=True)),
+                    ('zscore_grading_wfa_last_recorded',
+                     models.DateTimeField(help_text='Time when zscore_grading_wfa was last recorded', null=True)),
+                    ('zscore_grading_hfa',
+                     models.PositiveSmallIntegerField(help_text='Last value of zscore_grading_hfa in this month',
+                                                      null=True)),
+                    ('zscore_grading_hfa_last_recorded',
+                     models.DateTimeField(help_text='Time when zscore_grading_hfa was last recorded', null=True)),
+                    ('zscore_grading_wfh',
+                     models.PositiveSmallIntegerField(help_text='Current value of zscore_grading_wfh in this month',
+                                                      null=True)),
+                    ('zscore_grading_wfh_last_recorded',
+                     models.DateTimeField(help_text='Time when zscore_grading_wfh was last recorded', null=True)),
+                ],
+                options={
+                    'db_table': 'icds_dashboard_growth_monitoring_forms',
+                },
+            ),
+        ])
     ]

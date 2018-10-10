@@ -14,41 +14,99 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='AggregateCcsRecordPostnatalCareForms',
-            fields=[
-                ('state_id', models.CharField(max_length=40)),
-                ('month', models.DateField(help_text='Will always be YYYY-MM-01')),
-                ('case_id', models.CharField(max_length=40, primary_key=True, serialize=False)),
-                ('latest_time_end_processed', models.DateTimeField(help_text='The latest form.meta.timeEnd that has been processed for this case')),
-                ('counsel_methods', models.PositiveSmallIntegerField(help_text='Counseling about family planning methods has ever occurred')),
-            ],
-            options={
-                'db_table': 'icds_dashboard_ccs_record_postnatal_forms',
-            },
-        ),
-        migrations.CreateModel(
-            name='AggregateChildHealthPostnatalCareForms',
-            fields=[
-                ('state_id', models.CharField(max_length=40)),
-                ('month', models.DateField(help_text='Will always be YYYY-MM-01')),
-                ('case_id', models.CharField(max_length=40, primary_key=True, serialize=False)),
-                ('latest_time_end_processed', models.DateTimeField(help_text='The latest form.meta.timeEnd that has been processed for this case')),
-                ('counsel_increase_food_bf', models.PositiveSmallIntegerField(help_text='Counseling on increasing food intake has ever been completed')),
-                ('counsel_breast', models.PositiveSmallIntegerField(help_text='Counseling on managing breast problems has ever been completed')),
-                ('skin_to_skin', models.PositiveSmallIntegerField(help_text='Counseling on skin to skin care has ever been completed')),
-                ('is_ebf', models.PositiveSmallIntegerField(help_text='is_ebf set in the last form submitted this month')),
-                ('water_or_milk', models.PositiveSmallIntegerField(help_text='Child given water or milk in the last form submitted this month')),
-                ('other_milk_to_child', models.PositiveSmallIntegerField(help_text='Child given something other than milk in the last form submitted this month')),
-                ('tea_other', models.PositiveSmallIntegerField(help_text='Child given tea or other liquid in the last form submitted this month')),
-                ('eating', models.PositiveSmallIntegerField(help_text='Child given something to eat in the last form submitted this month')),
-                ('counsel_exclusive_bf', models.PositiveSmallIntegerField(help_text='Counseling about exclusive breastfeeding has ever occurred')),
-                ('counsel_only_milk', models.PositiveSmallIntegerField(help_text='Counseling about avoiding other than breast milk has ever occurred')),
-                ('counsel_adequate_bf', models.PositiveSmallIntegerField(help_text='Counseling about adequate breastfeeding has ever occurred')),
-                ('not_breastfeeding', models.CharField(help_text='The reason the mother is not able to breastfeed', max_length=126)),
-            ],
-            options={
-                'db_table': 'icds_dashboard_child_health_postnatal_forms',
-            },
-        ),
+        migrations.RunSQL("""
+            CREATE TABLE public.icds_dashboard_ccs_record_postnatal_forms (
+                state_id character varying(40) NOT NULL,
+                month date NOT NULL,
+                case_id character varying(40) NOT NULL,
+                latest_time_end_processed timestamp with time zone NOT NULL,
+                counsel_methods smallint,
+                CONSTRAINT icds_dashboard_ccs_record_postnatal_forms_counsel_methods_check CHECK ((counsel_methods >= 0))
+            )  PARTITION BY LIST (month)
+        """, state_operations=[
+            migrations.CreateModel(
+                name='AggregateCcsRecordPostnatalCareForms',
+                fields=[
+                    ('state_id', models.CharField(max_length=40)),
+                    ('month', models.DateField(help_text='Will always be YYYY-MM-01')),
+                    ('case_id', models.CharField(max_length=40, primary_key=True, serialize=False)),
+                    ('latest_time_end_processed', models.DateTimeField(
+                        help_text='The latest form.meta.timeEnd that has been processed for this case')),
+                    ('counsel_methods', models.PositiveSmallIntegerField(
+                        help_text='Counseling about family planning methods has ever occurred')),
+                ],
+                options={
+                    'db_table': 'icds_dashboard_ccs_record_postnatal_forms',
+                },
+            ),
+        ]),
+        migrations.RunSQL("""
+            CREATE TABLE icds_dashboard_child_health_postnatal_forms (
+                state_id character varying(40) NOT NULL,
+                month date NOT NULL,
+                case_id character varying(40) NOT NULL,
+                latest_time_end_processed timestamp with time zone NOT NULL,
+                counsel_increase_food_bf smallint,
+                counsel_breast smallint,
+                skin_to_skin smallint,
+                is_ebf smallint,
+                water_or_milk smallint,
+                other_milk_to_child smallint,
+                tea_other smallint,
+                eating smallint,
+                counsel_exclusive_bf smallint,
+                counsel_only_milk smallint,
+                counsel_adequate_bf smallint,
+                not_breastfeeding character varying(126),
+                CONSTRAINT icds_dashboard_child_health_post_counsel_increase_food_bf_check CHECK ((counsel_increase_food_bf >= 0)),
+                CONSTRAINT icds_dashboard_child_health_postnata_counsel_exclusive_bf_check CHECK ((counsel_exclusive_bf >= 0)),
+                CONSTRAINT icds_dashboard_child_health_postnatal_counsel_adequate_bf_check CHECK ((counsel_adequate_bf >= 0)),
+                CONSTRAINT icds_dashboard_child_health_postnatal_f_counsel_only_milk_check CHECK ((counsel_only_milk >= 0)),
+                CONSTRAINT icds_dashboard_child_health_postnatal_form_counsel_breast_check CHECK ((counsel_breast >= 0)),
+                CONSTRAINT icds_dashboard_child_health_postnatal_forms_eating_check CHECK ((eating >= 0)),
+                CONSTRAINT icds_dashboard_child_health_postnatal_forms_is_ebf_check CHECK ((is_ebf >= 0)),
+                CONSTRAINT icds_dashboard_child_health_postnatal_forms_skin_to_skin_check CHECK ((skin_to_skin >= 0)),
+                CONSTRAINT icds_dashboard_child_health_postnatal_forms_tea_other_check CHECK ((tea_other >= 0)),
+                CONSTRAINT icds_dashboard_child_health_postnatal_forms_water_or_milk_check CHECK ((water_or_milk >= 0)),
+                CONSTRAINT icds_dashboard_child_health_postnatal_other_milk_to_child_check CHECK ((other_milk_to_child >= 0))
+            ) PARTITION BY LIST (month)
+        """, state_operations=[
+            migrations.CreateModel(
+                name='AggregateChildHealthPostnatalCareForms',
+                fields=[
+                    ('state_id', models.CharField(max_length=40)),
+                    ('month', models.DateField(help_text='Will always be YYYY-MM-01')),
+                    ('case_id', models.CharField(max_length=40, primary_key=True, serialize=False)),
+                    ('latest_time_end_processed', models.DateTimeField(
+                        help_text='The latest form.meta.timeEnd that has been processed for this case')),
+                    ('counsel_increase_food_bf', models.PositiveSmallIntegerField(
+                        help_text='Counseling on increasing food intake has ever been completed')),
+                    ('counsel_breast', models.PositiveSmallIntegerField(
+                        help_text='Counseling on managing breast problems has ever been completed')),
+                    ('skin_to_skin', models.PositiveSmallIntegerField(
+                        help_text='Counseling on skin to skin care has ever been completed')),
+                    ('is_ebf',
+                     models.PositiveSmallIntegerField(help_text='is_ebf set in the last form submitted this month')),
+                    ('water_or_milk', models.PositiveSmallIntegerField(
+                        help_text='Child given water or milk in the last form submitted this month')),
+                    ('other_milk_to_child', models.PositiveSmallIntegerField(
+                        help_text='Child given something other than milk in the last form submitted this month')),
+                    ('tea_other', models.PositiveSmallIntegerField(
+                        help_text='Child given tea or other liquid in the last form submitted this month')),
+                    ('eating', models.PositiveSmallIntegerField(
+                        help_text='Child given something to eat in the last form submitted this month')),
+                    ('counsel_exclusive_bf', models.PositiveSmallIntegerField(
+                        help_text='Counseling about exclusive breastfeeding has ever occurred')),
+                    ('counsel_only_milk', models.PositiveSmallIntegerField(
+                        help_text='Counseling about avoiding other than breast milk has ever occurred')),
+                    ('counsel_adequate_bf', models.PositiveSmallIntegerField(
+                        help_text='Counseling about adequate breastfeeding has ever occurred')),
+                    ('not_breastfeeding',
+                     models.CharField(help_text='The reason the mother is not able to breastfeed', max_length=126)),
+                ],
+                options={
+                    'db_table': 'icds_dashboard_child_health_postnatal_forms',
+                },
+            ),
+        ])
     ]

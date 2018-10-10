@@ -14,17 +14,31 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='AggregateChildHealthDailyFeedingForms',
-            fields=[
-                ('state_id', models.CharField(max_length=40)),
-                ('month', models.DateField(help_text='Will always be YYYY-MM-01')),
-                ('case_id', models.CharField(max_length=40, primary_key=True, serialize=False)),
-                ('latest_time_end_processed', models.DateTimeField(help_text='The latest form.meta.timeEnd that has been processed for this case')),
-                ('sum_attended_child_ids', models.PositiveSmallIntegerField(help_text='Number of days the child has attended this month', null=True)),
-            ],
-            options={
-                'db_table': 'icds_dashboard_daily_feeding_forms',
-            },
-        ),
+        migrations.RunSQL("""
+            CREATE TABLE public.icds_dashboard_daily_feeding_forms (
+                state_id character varying(40) NOT NULL,
+                month date NOT NULL,
+                case_id character varying(40) NOT NULL,
+                latest_time_end_processed timestamp with time zone NOT NULL,
+                sum_attended_child_ids smallint,
+                CONSTRAINT icds_dashboard_daily_feeding_forms_sum_attended_child_ids_check CHECK ((sum_attended_child_ids >= 0))
+            ) PARTITION BY LIST (month)
+        """, state_operations=[
+            migrations.CreateModel(
+                name='AggregateChildHealthDailyFeedingForms',
+                fields=[
+                    ('state_id', models.CharField(max_length=40)),
+                    ('month', models.DateField(help_text='Will always be YYYY-MM-01')),
+                    ('case_id', models.CharField(max_length=40, primary_key=True, serialize=False)),
+                    ('latest_time_end_processed', models.DateTimeField(
+                        help_text='The latest form.meta.timeEnd that has been processed for this case')),
+                    ('sum_attended_child_ids',
+                     models.PositiveSmallIntegerField(help_text='Number of days the child has attended this month',
+                                                      null=True)),
+                ],
+                options={
+                    'db_table': 'icds_dashboard_daily_feeding_forms',
+                },
+            ),
+        ]),
     ]

@@ -14,17 +14,30 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='AggregateChildHealthTHRForms',
-            fields=[
-                ('state_id', models.CharField(max_length=40)),
-                ('month', models.DateField(help_text='Will always be YYYY-MM-01')),
-                ('case_id', models.CharField(max_length=40, primary_key=True, serialize=False)),
-                ('latest_time_end_processed', models.DateTimeField(help_text='The latest form.meta.timeEnd that has been processed for this case')),
-                ('days_ration_given_child', models.PositiveSmallIntegerField(help_text='Number of days the child has been given rations this month', null=True)),
-            ],
-            options={
-                'db_table': 'icds_dashboard_child_health_thr_forms',
-            },
-        ),
+        migrations.RunSQL("""
+            CREATE TABLE public.icds_dashboard_child_health_thr_forms (
+                state_id character varying(40) NOT NULL,
+                month date NOT NULL,
+                case_id character varying(40) NOT NULL,
+                latest_time_end_processed timestamp with time zone NOT NULL,
+                days_ration_given_child smallint,
+                CONSTRAINT icds_dashboard_child_health_thr_f_days_ration_given_child_check CHECK ((days_ration_given_child >= 0))
+            ) PARTITION BY LIST (month)
+        """, state_operations=[
+            migrations.CreateModel(
+                name='AggregateChildHealthTHRForms',
+                fields=[
+                    ('state_id', models.CharField(max_length=40)),
+                    ('month', models.DateField(help_text='Will always be YYYY-MM-01')),
+                    ('case_id', models.CharField(max_length=40, primary_key=True, serialize=False)),
+                    ('latest_time_end_processed', models.DateTimeField(
+                        help_text='The latest form.meta.timeEnd that has been processed for this case')),
+                    ('days_ration_given_child', models.PositiveSmallIntegerField(
+                        help_text='Number of days the child has been given rations this month', null=True)),
+                ],
+                options={
+                    'db_table': 'icds_dashboard_child_health_thr_forms',
+                },
+            ),
+        ]),
     ]
