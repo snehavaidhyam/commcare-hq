@@ -76,6 +76,9 @@ class BaseICDSAggregationHelper(object):
         hash_for_table = hashlib.md5(month_string).hexdigest()[8:]
         return self.aggregate_child_table_prefix + hash_for_table
 
+    def generate_temp_tablename(self):
+        return '{}_temp'.format(self.aggregate_child_table_prefix)
+
     def create_table_query(self, month=None):
         month = month or self.month
         month_string = month_formatter(month)
@@ -306,40 +309,66 @@ class PostnatalCareFormsChildHealthAggregationHelper(BaseICDSAggregationHelper):
         }
         query_params.update(ucr_query_params)
 
-        return """
-        INSERT INTO "{tablename}" (
-          state_id, month, case_id, supervisor_id, latest_time_end_processed, counsel_increase_food_bf,
-          counsel_breast, skin_to_skin, is_ebf, water_or_milk, other_milk_to_child,
-          tea_other, eating, counsel_exclusive_bf, counsel_only_milk, counsel_adequate_bf,
-          not_breastfeeding
-        ) (
-          SELECT
-            %(state_id)s AS state_id,
-            %(month)s AS month,
-            COALESCE(ucr.case_id, prev_month.case_id) AS case_id,
-            COALESCE(ucr.supervisor_id, prev_month.supervisor_id) AS supervisor_id,
-            GREATEST(ucr.latest_time_end, prev_month.latest_time_end_processed) AS latest_time_end_processed,
-            GREATEST(ucr.counsel_increase_food_bf, prev_month.counsel_increase_food_bf) AS counsel_increase_food_bf,
-            GREATEST(ucr.counsel_breast, prev_month.counsel_breast) AS counsel_breast,
-            GREATEST(ucr.skin_to_skin, prev_month.skin_to_skin) AS skin_to_skin,
-            ucr.is_ebf AS is_ebf,
-            ucr.water_or_milk AS water_or_milk,
-            ucr.other_milk_to_child AS other_milk_to_child,
-            ucr.tea_other AS tea_other,
-            ucr.eating AS eating,
-            GREATEST(ucr.counsel_exclusive_bf, prev_month.counsel_exclusive_bf) AS counsel_exclusive_bf,
-            GREATEST(ucr.counsel_only_milk, prev_month.counsel_only_milk) AS counsel_only_milk,
-            GREATEST(ucr.counsel_adequate_bf, prev_month.counsel_adequate_bf) AS counsel_adequate_bf,
-            ucr.not_breastfeeding AS not_breastfeeding
-          FROM ({ucr_table_query}) ucr
-          FULL OUTER JOIN "{previous_month_tablename}" prev_month
-          ON prev_month.state_id = %(state_id)s AND ucr.case_id = prev_month.case_id
-        )
-        """.format(
-            ucr_table_query=ucr_query,
-            previous_month_tablename=previous_month_tablename,
-            tablename=tablename
-        ), query_params
+        qs = [
+            ("DROP TABLE IF EXISTS {temp_table};", {}),
+            ("""
+             CREATE UNLOGGED TABLE {temp_table} (
+              case_id text,
+              supervisor_id text,
+              latest_time_end timestamp,
+              counsel_increase_food_bf smallint,
+              counsel_breast smallint,
+              skin_to_skin smallint,
+              is_ebf smallint,
+              water_or_milk smallint,
+              other_milk_to_child smallint,
+              tea_other smallint,
+              eating smallint,
+              counsel_exclusive_bf smallint,
+              counsel_only_milk smallint,
+              counsel_adequate_bf smallint,
+              not_breastfeeding text
+           );""", query_params),
+           ("SELECT create_distributed_table('{temp_table}', 'supervisor_id');", {}),
+           ("INSERT INTO {temp_table} ({ucr_table_query});", query_params),
+           ("""INSERT INTO "{tablename}" (
+             state_id, month, case_id, supervisor_id, latest_time_end_processed, counsel_increase_food_bf,
+             counsel_breast, skin_to_skin, is_ebf, water_or_milk, other_milk_to_child,
+             tea_other, eating, counsel_exclusive_bf, counsel_only_milk, counsel_adequate_bf,
+             not_breastfeeding
+           ) (
+             SELECT
+               %(state_id)s AS state_id,
+               %(month)s AS month,
+               COALESCE(ucr.case_id, prev_month.case_id) AS case_id,
+               COALESCE(ucr.supervisor_id, prev_month.supervisor_id) AS supervisor_id,
+               GREATEST(ucr.latest_time_end, prev_month.latest_time_end_processed) AS latest_time_end_processed,
+               GREATEST(ucr.counsel_increase_food_bf, prev_month.counsel_increase_food_bf) AS counsel_increase_food_bf,
+               GREATEST(ucr.counsel_breast, prev_month.counsel_breast) AS counsel_breast,
+               GREATEST(ucr.skin_to_skin, prev_month.skin_to_skin) AS skin_to_skin,
+               ucr.is_ebf AS is_ebf,
+               ucr.water_or_milk AS water_or_milk,
+               ucr.other_milk_to_child AS other_milk_to_child,
+               ucr.tea_other AS tea_other,
+               ucr.eating AS eating,
+               GREATEST(ucr.counsel_exclusive_bf, prev_month.counsel_exclusive_bf) AS counsel_exclusive_bf,
+               GREATEST(ucr.counsel_only_milk, prev_month.counsel_only_milk) AS counsel_only_milk,
+               GREATEST(ucr.counsel_adequate_bf, prev_month.counsel_adequate_bf) AS counsel_adequate_bf,
+               ucr.not_breastfeeding AS not_breastfeeding
+             FROM {temp_table} ucr
+             FULL OUTER JOIN "{previous_month_tablename}" prev_month
+             ON ucr.supervisor_id = prev_month.supervisor_id and prev_month.state_id = %(state_id)s AND ucr.case_id = prev_month.case_id
+           );""", query_params),
+           ("DROP TABLE {temp_table};", {})
+        ]
+        return [
+            (q[0].format(
+                ucr_table_query=ucr_query,
+                previous_month_tablename=previous_month_tablename,
+                tablename=tablename,
+                temp_table='temp_table_1'
+            ), q[1]) for q in qs
+        ]
 
     def compare_with_old_data_query(self):
         """Compares data from the complementary feeding forms aggregate table
