@@ -169,7 +169,7 @@ class TempTableAggHelper(object):
         raise NotImplementedError
 
 
-class ComplementaryFormsAggregationHelper(BaseICDSAggregationHelper):
+class ComplementaryFormsAggregationHelper(BaseICDSAggregationHelper, TempTableAggHelper):
     ucr_data_source_id = 'static-complementary_feeding_forms'
     aggregate_parent_table = AGG_COMP_FEEDING_TABLE
     aggregate_child_table_prefix = 'icds_db_child_cf_form_'
@@ -199,7 +199,7 @@ class ComplementaryFormsAggregationHelper(BaseICDSAggregationHelper):
         FROM "{ucr_tablename}"
         WHERE timeend >= %(current_month_start)s AND timeend < %(next_month_start)s AND state_id = %(state_id)s
         WINDOW w AS (
-            PARTITION BY child_health_case_id
+            PARTITION BY supervisor_id, child_health_case_id
             ORDER BY timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
         )
         """.format(ucr_tablename=self.ucr_tablename), {
@@ -208,17 +208,30 @@ class ComplementaryFormsAggregationHelper(BaseICDSAggregationHelper):
             "state_id": self.state_id
         }
 
-    def aggregation_query(self):
+    def temp_table_columns(self):
+        return [
+            ('case_id', 'text'),
+            ('supervisor_id', 'text'),
+            ('latest_time_end', 'timestamp'),
+            ('play_comp_feeding_vid', 'smallint'),
+            ('comp_feeding_ever', 'smallint'),
+            ('demo_comp_feeding', 'smallint'),
+            ('counselled_pediatric_ifa', 'smallint'),
+            ('comp_feeding_latest', 'smallint'),
+            ('diet_diversity', 'smallint'),
+            ('diet_quantity', 'smallint'),
+            ('hand_wash', 'smallint'),
+        ]
+
+    def insert_query(self):
         month = self.month.replace(day=1)
         tablename = self.generate_child_tablename(month)
         previous_month_tablename = self.generate_child_tablename(month - relativedelta(months=1))
 
-        ucr_query, ucr_query_params = self.data_from_ucr_query()
         query_params = {
             "month": month_formatter(month),
             "state_id": self.state_id
         }
-        query_params.update(ucr_query_params)
 
         # GREATEST calculations are for when we want to know if a thing has
         # ever happened to a case.
@@ -254,14 +267,14 @@ class ComplementaryFormsAggregationHelper(BaseICDSAggregationHelper):
             CASE WHEN ucr.latest_time_end IS NOT NULL
                  THEN ucr.hand_wash ELSE prev_month.hand_wash
             END AS hand_wash
-          FROM ({ucr_table_query}) ucr
+          FROM {temp_table} ucr
           FULL OUTER JOIN "{previous_month_tablename}" prev_month
-          ON ucr.case_id = prev_month.case_id
+          ON ucr.supervisor_id = prev_month.supervisor_id AND ucr.case_id = prev_month.case_id
         )
         """.format(
-            ucr_table_query=ucr_query,
             previous_month_tablename=previous_month_tablename,
-            tablename=tablename
+            tablename=tablename,
+            temp_table=self.temp_tablename
         ), query_params
 
     def compare_with_old_data_query(self):
@@ -377,7 +390,7 @@ class PostnatalCareFormsChildHealthAggregationHelper(BaseICDSAggregationHelper, 
                ucr.not_breastfeeding AS not_breastfeeding
             FROM {temp_table} ucr
             FULL OUTER JOIN "{previous_month_tablename}" prev_month
-            ON ucr.supervisor_id = prev_month.supervisor_id and prev_month.state_id = %(state_id)s AND ucr.case_id = prev_month.case_id
+            ON ucr.supervisor_id = prev_month.supervisor_id AND prev_month.state_id = %(state_id)s AND ucr.case_id = prev_month.case_id
             )""".format(
                 previous_month_tablename=previous_month_tablename,
                 tablename=tablename,
@@ -439,7 +452,7 @@ class PostnatalCareFormsChildHealthAggregationHelper(BaseICDSAggregationHelper, 
         }
 
 
-class PostnatalCareFormsCcsRecordAggregationHelper(BaseICDSAggregationHelper):
+class PostnatalCareFormsCcsRecordAggregationHelper(BaseICDSAggregationHelper, TempTableAggHelper):
     ucr_data_source_id = 'static-postnatal_care_forms'
     aggregate_parent_table = AGG_CCS_RECORD_PNC_TABLE
     aggregate_child_table_prefix = 'icds_db_ccs_pnc_form_'
@@ -472,17 +485,24 @@ class PostnatalCareFormsCcsRecordAggregationHelper(BaseICDSAggregationHelper):
             "state_id": self.state_id
         }
 
-    def aggregation_query(self):
+    def temp_table_columns(self):
+        return [
+            ('case_id', 'text'),
+            ('supervisor_id', 'text'),
+            ('latest_time_end', 'timestamp'),
+            ('counsel_methods', 'smallint'),
+            ('is_ebf', 'smallint'),
+        ]
+
+    def insert_query(self):
         month = self.month.replace(day=1)
         tablename = self.generate_child_tablename(month)
         previous_month_tablename = self.generate_child_tablename(month - relativedelta(months=1))
 
-        ucr_query, ucr_query_params = self.data_from_ucr_query()
         query_params = {
             "month": month_formatter(month),
             "state_id": self.state_id
         }
-        query_params.update(ucr_query_params)
 
         return """
         INSERT INTO "{tablename}" (
@@ -496,12 +516,12 @@ class PostnatalCareFormsCcsRecordAggregationHelper(BaseICDSAggregationHelper):
             GREATEST(ucr.latest_time_end, prev_month.latest_time_end_processed) AS latest_time_end_processed,
             GREATEST(ucr.counsel_methods, prev_month.counsel_methods) AS counsel_methods,
             ucr.is_ebf as is_ebf
-          FROM ({ucr_table_query}) ucr
+          FROM {temp_table} ucr
           FULL OUTER JOIN "{previous_month_tablename}" prev_month
-          ON ucr.case_id = prev_month.case_id
+          ON ucr.supervisor_id = prev_month.supervisor_id AND ucr.case_id = prev_month.case_id
         )
         """.format(
-            ucr_table_query=ucr_query,
+            temp_table=self.temp_tablename,
             previous_month_tablename=previous_month_tablename,
             tablename=tablename
         ), query_params
@@ -568,7 +588,7 @@ class THRFormsChildHealthAggregationHelper(BaseICDSAggregationHelper):
                 timeend >= %(current_month_start)s AND timeend < %(next_month_start)s AND
                 child_health_case_id IS NOT NULL
           WINDOW w AS (
-            PARTITION BY ccs_record_case_id
+            PARTITION BY supervisor_id, ccs_record_case_id
             ORDER BY timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
           )
         )
@@ -612,7 +632,7 @@ class THRFormsCcsRecordAggregationHelper(BaseICDSAggregationHelper):
                 timeend >= %(current_month_start)s AND timeend < %(next_month_start)s AND
                 ccs_record_case_id IS NOT NULL
           WINDOW w AS (
-            PARTITION BY ccs_record_case_id
+            PARTITION BY supervisor_id, ccs_record_case_id
             ORDER BY timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
           )
         )
@@ -835,7 +855,7 @@ class GrowthMonitoringFormsAggregationHelper(BaseICDSAggregationHelper, TempTabl
         }
 
 
-class BirthPreparednessFormsAggregationHelper(BaseICDSAggregationHelper):
+class BirthPreparednessFormsAggregationHelper(BaseICDSAggregationHelper, TempTableAggHelper):
     ucr_data_source_id = 'static-dashboard_birth_preparedness_forms'
     aggregate_parent_table = AGG_CCS_RECORD_BP_TABLE
     aggregate_child_table_prefix = 'icds_db_bp_form_'
@@ -872,7 +892,7 @@ class BirthPreparednessFormsAggregationHelper(BaseICDSAggregationHelper):
         FROM "{ucr_tablename}"
         WHERE timeend >= %(current_month_start)s AND timeend < %(next_month_start)s AND state_id = %(state_id)s
         WINDOW w AS (
-            PARTITION BY ccs_record_case_id
+            PARTITION BY supervisor_id, ccs_record_case_id
             ORDER BY timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
         )
         """.format(ucr_tablename=self.ucr_tablename), {
@@ -881,17 +901,37 @@ class BirthPreparednessFormsAggregationHelper(BaseICDSAggregationHelper):
             "state_id": self.state_id
         }
 
-    def aggregation_query(self):
+    def temp_table_columns(self):
+        return [
+            ('case_id', 'text'),
+            ('supervisor_id', 'text'),
+            ('latest_time_end', 'timestamp'),
+            ('immediate_breastfeeding', 'smallint'),
+            ('eating_extra', 'smallint'),
+            ('resting', 'smallint'),
+            ('anc_weight', 'smallint'),
+            ('anc_blood_pressure', 'smallint'),
+            ('bp_sys', 'smallint'),
+            ('bp_dia', 'smallint'),
+            ('anc_hemoglobin', 'smallint'),
+            ('bleeding', 'smallint'),
+            ('swelling', 'smallint'),
+            ('blurred_vision', 'smallint'),
+            ('convulsions', 'smallint'),
+            ('rupture', 'smallint'),
+            ('anemia', 'smallint'),
+            ('anc_abnormalities', 'smallint'),
+        ]
+
+    def insert_query(self):
         month = self.month.replace(day=1)
         tablename = self.generate_child_tablename(month)
         previous_month_tablename = self.generate_child_tablename(month - relativedelta(months=1))
 
-        ucr_query, ucr_query_params = self.data_from_ucr_query()
         query_params = {
             "month": month_formatter(month),
             "state_id": self.state_id
         }
-        query_params.update(ucr_query_params)
 
         return """
         INSERT INTO "{tablename}" (
@@ -921,12 +961,12 @@ class BirthPreparednessFormsAggregationHelper(BaseICDSAggregationHelper):
             ucr.convulsions as convulsions,
             ucr.rupture as rupture,
             ucr.anc_abnormalities as anc_abnormalities
-          FROM ({ucr_table_query}) ucr
+          FROM {temp_table} ucr
           LEFT JOIN "{previous_month_tablename}" prev_month
-          ON ucr.case_id = prev_month.case_id
+          ON ucr.supervisor_id = prev_month.supervisor_id AND ucr.case_id = prev_month.case_id
         )
         """.format(
-            ucr_table_query=ucr_query,
+            temp_table=self.temp_tablename,
             previous_month_tablename=previous_month_tablename,
             tablename=tablename
         ), query_params
@@ -994,7 +1034,7 @@ class DeliveryFormsAggregationHelper(BaseICDSAggregationHelper):
                 timeend >= %(current_month_start)s AND timeend < %(next_month_start)s AND
                 case_load_ccs_record0 IS NOT NULL
           WINDOW w AS (
-            PARTITION BY case_load_ccs_record0
+            PARTITION BY supervisor_id, case_load_ccs_record0
             ORDER BY timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
           )
         )
@@ -1339,7 +1379,7 @@ class InactiveAwwsAggregationHelper(BaseICDSAggregationHelper):
             FROM "{ucr_tablename}"
             WHERE inserted_at >= %(last_sync)s AND form_date <= %(now)s
             WINDOW forms AS (
-              PARTITION BY awc_id
+              PARTITION BY supervisor_id, awc_id
               ORDER BY form_date ASC RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
             )
         """.format(
@@ -1433,7 +1473,7 @@ class DailyFeedingFormsChildHealthAggregationHelper(BaseICDSAggregationHelper):
                 timeend >= %(current_month_start)s AND timeend < %(next_month_start)s AND
                 child_health_case_id IS NOT NULL
           WINDOW w AS (
-            PARTITION BY child_health_case_id
+            PARTITION BY supervisor_id, child_health_case_id
             ORDER BY timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
         )
         )
@@ -2119,7 +2159,7 @@ class AwcInfrastructureAggregationHelper(BaseICDSAggregationHelper):
             "LAST_VALUE({column}) OVER {column} AS {column}".format(column=column_name),
             """
             {column} AS (
-                PARTITION BY awc_id
+                PARTITION BY supervisor_id, awc_id
                 ORDER BY
                     CASE WHEN {column} IS NULL THEN 0 ELSE 1 END ASC,
                     timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING

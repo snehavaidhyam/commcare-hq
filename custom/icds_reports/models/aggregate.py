@@ -707,13 +707,14 @@ class AggregateComplementaryFeedingForms(models.Model):
         helper = ComplementaryFormsAggregationHelper(state_id, month)
         prev_month_query, prev_month_params = helper.create_table_query(month - relativedelta(months=1))
         curr_month_query, curr_month_params = helper.create_table_query()
-        agg_query, agg_params = helper.aggregation_query()
+        agg_queries = helper.aggregation_query()
 
         with get_cursor(cls) as cursor:
             cursor.execute(prev_month_query, prev_month_params)
             cursor.execute(curr_month_query, curr_month_params)
             cursor.execute(*helper.drop_table_query())
-            cursor.execute(agg_query, agg_params)
+            for query, params in agg_queries:
+                cursor.execute(query, params)
 
     @classmethod
     def compare_with_old_data(cls, state_id, month):
@@ -867,13 +868,14 @@ class AggregateCcsRecordPostnatalCareForms(models.Model):
         helper = PostnatalCareFormsCcsRecordAggregationHelper(state_id, month)
         prev_month_query, prev_month_params = helper.create_table_query(month - relativedelta(months=1))
         curr_month_query, curr_month_params = helper.create_table_query()
-        agg_query, agg_params = helper.aggregation_query()
+        agg_queries = helper.aggregation_query()
 
         with get_cursor(cls) as cursor:
             cursor.execute(prev_month_query, prev_month_params)
             cursor.execute(curr_month_query, curr_month_params)
             cursor.execute(*helper.drop_table_query())
-            cursor.execute(agg_query, agg_params)
+            for query, params in agg_queries:
+                cursor.execute(query, params)
 
     @classmethod
     def compare_with_old_data(cls, state_id, month):
@@ -1144,13 +1146,14 @@ class AggregateBirthPreparednesForms(models.Model):
         helper = BirthPreparednessFormsAggregationHelper(state_id, month)
         prev_month_query, prev_month_params = helper.create_table_query(month - relativedelta(months=1))
         curr_month_query, curr_month_params = helper.create_table_query()
-        agg_query, agg_params = helper.aggregation_query()
+        agg_queries = helper.aggregation_query()
 
         with get_cursor(cls) as cursor:
             cursor.execute(prev_month_query, prev_month_params)
             cursor.execute(curr_month_query, curr_month_params)
             cursor.execute(*helper.drop_table_query())
-            cursor.execute(agg_query, agg_params)
+            for query, params in agg_queries:
+                cursor.execute(query, params)
 
     @classmethod
     def compare_with_old_data(cls, state_id, month):
