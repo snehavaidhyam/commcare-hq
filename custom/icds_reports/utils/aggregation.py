@@ -712,54 +712,79 @@ class GrowthMonitoringFormsAggregationHelper(BaseICDSAggregationHelper):
         }
         query_params.update(ucr_query_params)
 
+        temp_tablename = self.generate_temp_tablename()
         # The '1970-01-01' is a fallback, this should never happen,
         # but an unexpected NULL should not block other data
-        return """
-        INSERT INTO "{tablename}" (
-            state_id, month, case_id, supervisor_id, latest_time_end_processed,
-            weight_child, weight_child_last_recorded,
-            height_child, height_child_last_recorded,
-            zscore_grading_wfa, zscore_grading_wfa_last_recorded,
-            zscore_grading_hfa, zscore_grading_hfa_last_recorded,
-            zscore_grading_wfh, zscore_grading_wfh_last_recorded,
-            muac_grading, muac_grading_last_recorded
-        ) (
-          SELECT
-            %(state_id)s AS state_id,
-            %(month)s AS month,
-            COALESCE(ucr.case_id, prev_month.case_id) AS case_id,
-            COALESCE(ucr.supervisor_id, prev_month.supervisor_id) AS supervisor_id,
-            GREATEST(
-                ucr.weight_child_last_recorded,
-                ucr.height_child_last_recorded,
-                ucr.zscore_grading_wfa_last_recorded,
-                ucr.zscore_grading_hfa_last_recorded,
-                ucr.zscore_grading_wfh_last_recorded,
-                ucr.muac_grading_last_recorded,
-                prev_month.latest_time_end_processed,
-                '1970-01-01'
-            ) AS latest_time_end_processed,
-            COALESCE(ucr.weight_child, prev_month.weight_child) AS weight_child,
-            GREATEST(ucr.weight_child_last_recorded, prev_month.weight_child_last_recorded) AS weight_child_last_recorded,
-            COALESCE(ucr.height_child, prev_month.height_child) AS height_child,
-            GREATEST(ucr.height_child_last_recorded, prev_month.height_child_last_recorded) AS height_child_last_recorded,
-            COALESCE(ucr.zscore_grading_wfa, prev_month.zscore_grading_wfa) AS zscore_grading_wfa,
-            GREATEST(ucr.zscore_grading_wfa_last_recorded, prev_month.zscore_grading_wfa_last_recorded) AS zscore_grading_wfa_last_recorded,
-            COALESCE(ucr.zscore_grading_hfa, prev_month.zscore_grading_hfa) AS zscore_grading_hfa,
-            GREATEST(ucr.zscore_grading_hfa_last_recorded, prev_month.zscore_grading_hfa_last_recorded) AS zscore_grading_hfa_last_recorded,
-            COALESCE(ucr.zscore_grading_wfh, prev_month.zscore_grading_wfh) AS zscore_grading_wfh,
-            GREATEST(ucr.zscore_grading_wfh_last_recorded, prev_month.zscore_grading_wfh_last_recorded) AS zscore_grading_wfh_last_recorded,
-            COALESCE(ucr.muac_grading, prev_month.muac_grading) AS muac_grading,
-            GREATEST(ucr.muac_grading_last_recorded, prev_month.muac_grading_last_recorded) AS muac_grading_last_recorded
-          FROM ({ucr_table_query}) ucr
-          FULL OUTER JOIN "{previous_month_tablename}" prev_month
-          ON ucr.case_id = prev_month.case_id
-        )
-        """.format(
-            ucr_table_query=ucr_query,
-            previous_month_tablename=previous_month_tablename,
-            tablename=tablename
-        ), query_params
+        return [
+            ("DROP TABLE IF EXISTS {temp_table}".format(temp_table=temp_tablename), {}),
+            ("""CREATE TABLE {temp_table} (
+                case_id text,
+                supervisor_id text,
+                weight_child numeric,
+                weight_child_last_recorded timestamp,
+                height_child numeric,
+                height_child_last_recorded timestamp,
+                zscore_grading_wfa smallint,
+                zscore_grading_wfa_last_recorded timestamp,
+                zscore_grading_hfa smallint,
+                zscore_grading_hfa_last_recorded timestamp,
+                zscore_grading_wfh smallint,
+                zscore_grading_wfh_last_recorded timestamp,
+                muac_grading smallint,
+                muac_grading_last_recorded timestamp
+            )
+            """.format(temp_table=temp_tablename), {}),
+            ("SELECT create_distributed_table('{temp_table}', 'supervisor_id')".format(temp_table=temp_tablename), {}),
+            ("INSERT INTO {temp_table} ({ucr_table_query})".format(
+                temp_table=temp_tablename,
+                ucr_table_query=ucr_query
+            ), query_params),
+            ("""INSERT INTO "{tablename}" (
+                state_id, month, case_id, supervisor_id, latest_time_end_processed,
+                weight_child, weight_child_last_recorded,
+                height_child, height_child_last_recorded,
+                zscore_grading_wfa, zscore_grading_wfa_last_recorded,
+                zscore_grading_hfa, zscore_grading_hfa_last_recorded,
+                zscore_grading_wfh, zscore_grading_wfh_last_recorded,
+                muac_grading, muac_grading_last_recorded
+            ) (
+              SELECT
+                %(state_id)s AS state_id,
+                %(month)s AS month,
+                COALESCE(ucr.case_id, prev_month.case_id) AS case_id,
+                COALESCE(ucr.supervisor_id, prev_month.supervisor_id) AS supervisor_id,
+                GREATEST(
+                    ucr.weight_child_last_recorded,
+                    ucr.height_child_last_recorded,
+                    ucr.zscore_grading_wfa_last_recorded,
+                    ucr.zscore_grading_hfa_last_recorded,
+                    ucr.zscore_grading_wfh_last_recorded,
+                    ucr.muac_grading_last_recorded,
+                    prev_month.latest_time_end_processed,
+                    '1970-01-01'
+                ) AS latest_time_end_processed,
+                COALESCE(ucr.weight_child, prev_month.weight_child) AS weight_child,
+                GREATEST(ucr.weight_child_last_recorded, prev_month.weight_child_last_recorded) AS weight_child_last_recorded,
+                COALESCE(ucr.height_child, prev_month.height_child) AS height_child,
+                GREATEST(ucr.height_child_last_recorded, prev_month.height_child_last_recorded) AS height_child_last_recorded,
+                COALESCE(ucr.zscore_grading_wfa, prev_month.zscore_grading_wfa) AS zscore_grading_wfa,
+                GREATEST(ucr.zscore_grading_wfa_last_recorded, prev_month.zscore_grading_wfa_last_recorded) AS zscore_grading_wfa_last_recorded,
+                COALESCE(ucr.zscore_grading_hfa, prev_month.zscore_grading_hfa) AS zscore_grading_hfa,
+                GREATEST(ucr.zscore_grading_hfa_last_recorded, prev_month.zscore_grading_hfa_last_recorded) AS zscore_grading_hfa_last_recorded,
+                COALESCE(ucr.zscore_grading_wfh, prev_month.zscore_grading_wfh) AS zscore_grading_wfh,
+                GREATEST(ucr.zscore_grading_wfh_last_recorded, prev_month.zscore_grading_wfh_last_recorded) AS zscore_grading_wfh_last_recorded,
+                COALESCE(ucr.muac_grading, prev_month.muac_grading) AS muac_grading,
+                GREATEST(ucr.muac_grading_last_recorded, prev_month.muac_grading_last_recorded) AS muac_grading_last_recorded
+              FROM {temp_table} ucr
+              FULL OUTER JOIN "{previous_month_tablename}" prev_month
+              ON ucr.supervisor_id = prev_month.supervisor_id and ucr.case_id = prev_month.case_id
+            )
+            """.format(
+                ucr_table_query=ucr_query,
+                previous_month_tablename=previous_month_tablename,
+                tablename=tablename,
+                temp_table=temp_tablename
+            ), query_params)]
 
     def compare_with_old_data_query(self):
         # only partially implements this comparison for now
