@@ -659,37 +659,37 @@ class GrowthMonitoringFormsAggregationHelper(BaseICDSAggregationHelper):
                 AND state_id = %(state_id)s AND child_health_case_id IS NOT NULL
             WINDOW
                 weight_child AS (
-                    PARTITION BY child_health_case_id
+                    PARTITION BY supervisor_id, child_health_case_id
                     ORDER BY
                         CASE WHEN weight_child IS NULL THEN 0 ELSE 1 END ASC,
                         timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
                 ),
                 height_child AS (
-                    PARTITION BY child_health_case_id
+                    PARTITION BY supervisor_id, child_health_case_id
                     ORDER BY
                         CASE WHEN height_child IS NULL THEN 0 ELSE 1 END ASC,
                         timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
                 ),
                 zscore_grading_wfa AS (
-                    PARTITION BY child_health_case_id
+                    PARTITION BY supervisor_id, child_health_case_id
                     ORDER BY
                         CASE WHEN zscore_grading_wfa = 0 THEN 0 ELSE 1 END ASC,
                         timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
                 ),
                 zscore_grading_hfa AS (
-                    PARTITION BY child_health_case_id
+                    PARTITION BY supervisor_id, child_health_case_id
                     ORDER BY
                         CASE WHEN zscore_grading_hfa = 0 THEN 0 ELSE 1 END ASC,
                         timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
                 ),
                 zscore_grading_wfh AS (
-                    PARTITION BY child_health_case_id
+                    PARTITION BY supervisor_id, child_health_case_id
                     ORDER BY
                         CASE WHEN zscore_grading_wfh = 0 THEN 0 ELSE 1 END ASC,
                         timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
                 ),
                 muac_grading AS (
-                    PARTITION BY child_health_case_id
+                    PARTITION BY supervisor_id, child_health_case_id
                     ORDER BY
                         CASE WHEN muac_grading = 0 THEN 0 ELSE 1 END ASC,
                         timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
