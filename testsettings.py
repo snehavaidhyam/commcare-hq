@@ -85,9 +85,7 @@ _set_logging_levels({
     'requests.packages.urllib3': 'WARNING',
     's3transfer': 'INFO',
     'urllib3': 'WARNING',
-    'kafka.conn': 'WARNING',
-    'kafka.client': 'WARNING',
-    'kafka.consumer.kafka': 'WARNING',
+    'kafka': 'WARNING',
 })
 
 # use empty LOGGING dict with --debug=nose,nose.plugins to debug test discovery
@@ -101,8 +99,8 @@ LOGGING = {
 REPORTING_DATABASES = {
     'default': 'default',
     'ucr': 'default',
-    'icds-ucr': 'default',
-    'icds-test-ucr': 'default',
+    'icds-ucr': 'icds-ucr',
+    'icds-test-ucr': 'icds-ucr',
 }
 
 # See comment under settings.SMS_QUEUE_ENABLED

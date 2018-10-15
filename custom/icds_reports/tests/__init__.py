@@ -25,26 +25,26 @@ from custom.icds_reports.tasks import (
 from io import open
 
 FILE_NAME_TO_TABLE_MAPPING = {
-    'awc_mgmt': 'config_report_icds-cas_static-awc_mgt_forms_ad1b11f0',
-    'ccs_monthly': 'config_report_icds-cas_static-ccs_record_cases_monthly_d0e2e49e',
-    'child_cases': 'config_report_icds-cas_static-child_health_cases_a46c129f',
-    'child_monthly': 'config_report_icds-cas_static-child_cases_monthly_tabl_551fd064',
-    'daily_feeding': 'config_report_icds-cas_static-daily_feeding_forms_85b1167f',
-    'household_cases': 'config_report_icds-cas_static-household_cases_eadc276d',
-    'infrastructure': 'config_report_icds-cas_static-infrastructure_form_05fe0f1a',
-    'infrastructure_v2': 'config_report_icds-cas_static-infrastructure_form_v2_36e9ebb0',
-    'location_ucr': 'config_report_icds-cas_static-awc_location_88b3f9c3',
-    'person_cases': 'config_report_icds-cas_static-person_cases_v2_b4b5d57a',
-    'usage': 'config_report_icds-cas_static-usage_forms_92fbe2aa',
-    'vhnd': 'config_report_icds-cas_static-vhnd_form_28e7fd58',
-    'complementary_feeding': 'config_report_icds-cas_static-complementary_feeding_fo_4676987e',
-    'aww_user': 'config_report_icds-cas_static-commcare_user_cases_85763310',
-    'child_tasks': 'config_report_icds-cas_static-child_tasks_cases_3548e54b',
-    'pregnant_tasks': 'config_report_icds-cas_static-pregnant-tasks_cases_6c2a698f',
-    'thr_form': 'config_report_icds-cas_static-dashboard_thr_forms_b8bca6ea',
-    'gm_form': 'config_report_icds-cas_static-dashboard_growth_monitor_8f61534c',
-    'pnc_forms': 'config_report_icds-cas_static-postnatal_care_forms_0c30d94e',
-    'dashboard_daily_feeding': 'config_report_icds-cas_dashboard_child_health_daily_fe_f83b12b7',
+    'awc_mgmt': 'cr_icds-cas_static-awc_mgt_forms_ad1b11f0',
+    'ccs_monthly': 'cr_icds-cas_static-ccs_record_cases_monthly_tableau_v2_74b5bb36',
+    'child_cases': 'cr_icds-cas_static-child_health_cases_a46c129f',
+    'child_monthly': 'cr_icds-cas_static-child_cases_monthly_tableau_v2_33c29ded',
+    'daily_feeding': 'cr_icds-cas_static-daily_feeding_forms_85b1167f',
+    'household_cases': 'cr_icds-cas_static-household_cases_eadc276d',
+    'infrastructure': 'cr_icds-cas_static-infrastructure_form_05fe0f1a',
+    'infrastructure_v2': 'cr_icds-cas_static-infrastructure_form_v2_36e9ebb0',
+    'location_ucr': 'cr_icds-cas_static-awc_location_88b3f9c3',
+    'person_cases': 'cr_icds-cas_static-person_cases_v2_b4b5d57a',
+    'usage': 'cr_icds-cas_static-usage_forms_92fbe2aa',
+    'vhnd': 'cr_icds-cas_static-vhnd_form_28e7fd58',
+    'complementary_feeding': 'cr_icds-cas_static-complementary_feeding_forms_c4c6c501',
+    'aww_user': 'cr_icds-cas_static-commcare_user_cases_85763310',
+    'child_tasks': 'cr_icds-cas_static-child_tasks_cases_3548e54b',
+    'pregnant_tasks': 'cr_icds-cas_static-pregnant-tasks_cases_6c2a698f',
+    'thr_form': 'cr_icds-cas_static-dashboard_thr_forms_b8bca6ea',
+    'gm_form': 'cr_icds-cas_static-dashboard_growth_monitoring_forms_fadf4d83',
+    'pnc_forms': 'cr_icds-cas_static-postnatal_care_forms_0c30d94e',
+    'dashboard_daily_feeding': 'cr_icds-cas_dashboard_child_health_daily_feeding_forms_642b39e5',
 }
 
 
@@ -124,11 +124,12 @@ def setUpModule():
                     ]
                     postgres_copy.copy_from(f, table, engine, format=b'csv', null=b'', columns=columns)
 
-        _aggregate_child_health_pnc_forms('st1', datetime(2017, 3, 31))
-        _aggregate_gm_forms('st1', datetime(2017, 3, 31))
 
         try:
+            _aggregate_child_health_pnc_forms('st1', datetime(2017, 3, 31))
+            _aggregate_gm_forms('st1', datetime(2017, 3, 31))
             move_ucr_data_into_aggregation_tables(datetime(2017, 5, 28), intervals=2)
+            pass
         except AssertionError as e:
             # we always use soft assert to email when the aggregation has completed
             if "Aggregation completed" not in str(e):
@@ -151,23 +152,23 @@ def tearDownModule():
         'corehq.apps.callcenter.data_source.call_center_data_source_configuration_provider'
     )
     _call_center_domain_mock.start()
-    with override_settings(SERVER_ENVIRONMENT='icds-new'):
-        configs = StaticDataSourceConfiguration.by_domain('icds-cas')
-        adapters = [get_indicator_adapter(config) for config in configs]
-        for adapter in adapters:
-            if adapter.config.table_id == 'static-child_health_cases':
-                # hack because this is in a migration
-                adapter.clear_table()
-                continue
-            adapter.drop_table()
-
-        engine = connection_manager.get_engine(ICDS_UCR_ENGINE_ID)
-        with engine.begin() as connection:
-            metadata = sqlalchemy.MetaData(bind=engine)
-            metadata.reflect(bind=engine, extend_existing=True)
-            table = metadata.tables['ucr_table_name_mapping']
-            delete = table.delete()
-            connection.execute(delete)
+    # with override_settings(SERVER_ENVIRONMENT='icds-new'):
+    #     configs = StaticDataSourceConfiguration.by_domain('icds-cas')
+    #     adapters = [get_indicator_adapter(config) for config in configs]
+    #     for adapter in adapters:
+    #         if adapter.config.table_id == 'static-child_health_cases':
+    #             # hack because this is in a migration
+    #             adapter.clear_table()
+    #             continue
+    #         adapter.drop_table()
+    #
+    #     engine = connection_manager.get_engine(ICDS_UCR_ENGINE_ID)
+    #     with engine.begin() as connection:
+    #         metadata = sqlalchemy.MetaData(bind=engine)
+    #         metadata.reflect(bind=engine, extend_existing=True)
+    #         table = metadata.tables['ucr_table_name_mapping']
+    #         delete = table.delete()
+    #         connection.execute(delete)
     LocationType.objects.filter(domain='icds-cas').delete()
     SQLLocation.objects.filter(domain='icds-cas').delete()
 

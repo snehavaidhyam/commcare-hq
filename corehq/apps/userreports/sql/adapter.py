@@ -57,6 +57,7 @@ class IndicatorSqlAdapter(IndicatorAdapter):
         return type_
 
     def _install_partition(self):
+        return
         if self.config.sql_settings.partition_config:
             config = self.config.sql_settings.partition_config[0]
             partition = install(

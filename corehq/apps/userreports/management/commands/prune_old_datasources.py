@@ -9,7 +9,7 @@ from django.core.management.base import BaseCommand
 
 from corehq.apps.userreports.models import DataSourceConfiguration, StaticDataSourceConfiguration
 from corehq.apps.userreports.sql.adapter import metadata
-from corehq.apps.userreports.util import get_indicator_adapter
+from corehq.apps.userreports.util import get_indicator_adapter, UCR_TABLE_PREFIX
 from corehq.sql_db.connections import connection_manager
 
 from fluff.signals import get_migration_context, reformat_alembic_diffs
@@ -81,7 +81,7 @@ def _include_object(object_, name, type_, reflected, compare_to):
     if type_ != 'table':
         return False
 
-    if name.startswith('config_report_'):
+    if name.startswith(UCR_TABLE_PREFIX):
         return True
 
     return False

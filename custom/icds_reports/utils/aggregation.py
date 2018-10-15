@@ -90,8 +90,10 @@ class BaseICDSAggregationHelper(object):
             LIKE "{parent_tablename}" INCLUDING DEFAULTS INCLUDING CONSTRAINTS INCLUDING INDEXES
         ) INHERITS ("{parent_tablename}")
         """
+
+        # TODO: create primary keys, indexes etc on these tables since you can't create them on the master table
         return add_if_not_exists_raw("""
-        CREATE TABLE "{child_tablename}" PARTITION OF "{parent_tablename}" 
+        CREATE TABLE "{child_tablename}" PARTITION OF "{parent_tablename}"
         FOR VALUES IN (%(month_string)s)
         """.format(
             parent_tablename=self.aggregate_parent_table,
