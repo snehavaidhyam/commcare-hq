@@ -76,9 +76,6 @@ class BaseICDSAggregationHelper(object):
         hash_for_table = hashlib.md5(month_string).hexdigest()[8:]
         return self.aggregate_child_table_prefix + hash_for_table
 
-    def generate_temp_tablename(self):
-        return '{}_temp'.format(self.aggregate_child_table_prefix)
-
     def create_table_query(self, month=None):
         month = month or self.month
         month_string = month_formatter(month)
@@ -124,6 +121,51 @@ class BaseICDSAggregationHelper(object):
         (SQL query, query parameters) that will return any rows that are
         inconsistent from the old data to the new.
         """
+        raise NotImplementedError
+
+
+class TempTableAggHelper(object):
+    @cached_property
+    def temp_tablename(self):
+        return '{}_temp'.format(self.aggregate_child_table_prefix)
+
+    def temp_table_create(self, cols):
+        col_list = ',\n'.join(["{} {}".format(*col) for col in cols])
+        return """
+        CREATE UNLOGGED TABLE {temp_table} (
+            {columns}
+        )
+        """.format(
+            temp_table=self.temp_tablename,
+            columns=col_list
+        ), {}
+
+    def temp_table_drop(self):
+        return 'DROP TABLE IF EXISTS {}'.format(self.temp_tablename), {}
+
+    def temp_table_insert(self, ucr_query, ucr_query_params):
+        return "INSERT INTO {temp_table} ({ucr_table_query})".format(
+            temp_table=self.temp_tablename,
+            ucr_table_query=ucr_query
+        ), ucr_query_params
+
+    def temp_table_distribute(self):
+        return "SELECT create_distributed_table('{}', 'supervisor_id')".format(self.temp_tablename), {}
+
+    def aggregation_query(self):
+        return [
+            self.temp_table_drop(),
+            self.temp_table_create(self.temp_table_columns()),
+            self.temp_table_distribute(),
+            self.temp_table_insert(*self.data_from_ucr_query()),
+            self.insert_query(),
+            self.temp_table_drop()
+        ]
+
+    def temp_table_columns(self):
+        raise NotImplementedError
+
+    def insert_query(self):
         raise NotImplementedError
 
 
@@ -253,7 +295,7 @@ class ComplementaryFormsAggregationHelper(BaseICDSAggregationHelper):
         }
 
 
-class PostnatalCareFormsChildHealthAggregationHelper(BaseICDSAggregationHelper):
+class PostnatalCareFormsChildHealthAggregationHelper(BaseICDSAggregationHelper, TempTableAggHelper):
     ucr_data_source_id = 'static-postnatal_care_forms'
     aggregate_parent_table = AGG_CHILD_HEALTH_PNC_TABLE
     aggregate_child_table_prefix = 'icds_db_child_pnc_form_'
@@ -299,47 +341,23 @@ class PostnatalCareFormsChildHealthAggregationHelper(BaseICDSAggregationHelper):
             "state_id": self.state_id
         }
 
-    def aggregation_query(self):
+    def insert_query(self):
         month = self.month.replace(day=1)
         tablename = self.generate_child_tablename(month)
         previous_month_tablename = self.generate_child_tablename(month - relativedelta(months=1))
-
-        ucr_query, ucr_query_params = self.data_from_ucr_query()
         query_params = {
             "month": month_formatter(month),
             "state_id": self.state_id
         }
-        query_params.update(ucr_query_params)
 
-        qs = [
-            ("DROP TABLE IF EXISTS {temp_table};", {}),
-            ("""
-             CREATE UNLOGGED TABLE {temp_table} (
-              case_id text,
-              supervisor_id text,
-              latest_time_end timestamp,
-              counsel_increase_food_bf smallint,
-              counsel_breast smallint,
-              skin_to_skin smallint,
-              is_ebf smallint,
-              water_or_milk smallint,
-              other_milk_to_child smallint,
-              tea_other smallint,
-              eating smallint,
-              counsel_exclusive_bf smallint,
-              counsel_only_milk smallint,
-              counsel_adequate_bf smallint,
-              not_breastfeeding text
-           );""", query_params),
-           ("SELECT create_distributed_table('{temp_table}', 'supervisor_id');", {}),
-           ("INSERT INTO {temp_table} ({ucr_table_query});", query_params),
-           ("""INSERT INTO "{tablename}" (
-             state_id, month, case_id, supervisor_id, latest_time_end_processed, counsel_increase_food_bf,
-             counsel_breast, skin_to_skin, is_ebf, water_or_milk, other_milk_to_child,
-             tea_other, eating, counsel_exclusive_bf, counsel_only_milk, counsel_adequate_bf,
-             not_breastfeeding
-           ) (
-             SELECT
+        return """
+            INSERT INTO "{tablename}" (
+            state_id, month, case_id, supervisor_id, latest_time_end_processed, counsel_increase_food_bf,
+            counsel_breast, skin_to_skin, is_ebf, water_or_milk, other_milk_to_child,
+            tea_other, eating, counsel_exclusive_bf, counsel_only_milk, counsel_adequate_bf,
+            not_breastfeeding
+            ) (
+            SELECT
                %(state_id)s AS state_id,
                %(month)s AS month,
                COALESCE(ucr.case_id, prev_month.case_id) AS case_id,
@@ -357,19 +375,32 @@ class PostnatalCareFormsChildHealthAggregationHelper(BaseICDSAggregationHelper):
                GREATEST(ucr.counsel_only_milk, prev_month.counsel_only_milk) AS counsel_only_milk,
                GREATEST(ucr.counsel_adequate_bf, prev_month.counsel_adequate_bf) AS counsel_adequate_bf,
                ucr.not_breastfeeding AS not_breastfeeding
-             FROM {temp_table} ucr
-             FULL OUTER JOIN "{previous_month_tablename}" prev_month
-             ON ucr.supervisor_id = prev_month.supervisor_id and prev_month.state_id = %(state_id)s AND ucr.case_id = prev_month.case_id
-           );""", query_params),
-           ("DROP TABLE {temp_table};", {})
-        ]
-        return [
-            (q[0].format(
-                ucr_table_query=ucr_query,
+            FROM {temp_table} ucr
+            FULL OUTER JOIN "{previous_month_tablename}" prev_month
+            ON ucr.supervisor_id = prev_month.supervisor_id and prev_month.state_id = %(state_id)s AND ucr.case_id = prev_month.case_id
+            )""".format(
                 previous_month_tablename=previous_month_tablename,
                 tablename=tablename,
-                temp_table='temp_table_1'
-            ), q[1]) for q in qs
+                temp_table=self.temp_tablename
+            ), query_params
+
+    def temp_table_columns(self):
+        return [
+            ('case_id', 'text'),
+            ('supervisor_id', 'text'),
+            ('latest_time_end', 'timestamp'),
+            ('counsel_increase_food_bf', 'smallint'),
+            ('counsel_breast', 'smallint'),
+            ('skin_to_skin', 'smallint'),
+            ('is_ebf', 'smallint'),
+            ('water_or_milk', 'smallint'),
+            ('other_milk_to_child', 'smallint'),
+            ('tea_other', 'smallint'),
+            ('eating', 'smallint'),
+            ('counsel_exclusive_bf', 'smallint'),
+            ('counsel_only_milk', 'smallint'),
+            ('counsel_adequate_bf', 'smallint'),
+            ('not_breastfeeding', 'text'),
         ]
 
     def compare_with_old_data_query(self):
@@ -591,7 +622,7 @@ class THRFormsCcsRecordAggregationHelper(BaseICDSAggregationHelper):
         ), query_params
 
 
-class GrowthMonitoringFormsAggregationHelper(BaseICDSAggregationHelper):
+class GrowthMonitoringFormsAggregationHelper(BaseICDSAggregationHelper, TempTableAggHelper):
     ucr_data_source_id = 'static-dashboard_growth_monitoring_forms'
     aggregate_parent_table = AGG_GROWTH_MONITORING_TABLE
     aggregate_child_table_prefix = 'icds_db_gm_form_'
@@ -702,46 +733,19 @@ class GrowthMonitoringFormsAggregationHelper(BaseICDSAggregationHelper):
             "state_id": self.state_id
         }
 
-    def aggregation_query(self):
+    def insert_query(self):
         month = self.month.replace(day=1)
         tablename = self.generate_child_tablename(month)
         previous_month_tablename = self.generate_child_tablename(month - relativedelta(months=1))
 
-        ucr_query, ucr_query_params = self.data_from_ucr_query()
         query_params = {
-            "month": month_formatter(month),
-            "state_id": self.state_id
+            'month': month,
+            'state_id': self.state_id
         }
-        query_params.update(ucr_query_params)
 
-        temp_tablename = self.generate_temp_tablename()
         # The '1970-01-01' is a fallback, this should never happen,
         # but an unexpected NULL should not block other data
-        return [
-            ("DROP TABLE IF EXISTS {temp_table}".format(temp_table=temp_tablename), {}),
-            ("""CREATE TABLE {temp_table} (
-                case_id text,
-                supervisor_id text,
-                weight_child numeric,
-                weight_child_last_recorded timestamp,
-                height_child numeric,
-                height_child_last_recorded timestamp,
-                zscore_grading_wfa smallint,
-                zscore_grading_wfa_last_recorded timestamp,
-                zscore_grading_hfa smallint,
-                zscore_grading_hfa_last_recorded timestamp,
-                zscore_grading_wfh smallint,
-                zscore_grading_wfh_last_recorded timestamp,
-                muac_grading smallint,
-                muac_grading_last_recorded timestamp
-            )
-            """.format(temp_table=temp_tablename), {}),
-            ("SELECT create_distributed_table('{temp_table}', 'supervisor_id')".format(temp_table=temp_tablename), {}),
-            ("INSERT INTO {temp_table} ({ucr_table_query})".format(
-                temp_table=temp_tablename,
-                ucr_table_query=ucr_query
-            ), query_params),
-            ("""INSERT INTO "{tablename}" (
+        return """INSERT INTO "{tablename}" (
                 state_id, month, case_id, supervisor_id, latest_time_end_processed,
                 weight_child, weight_child_last_recorded,
                 height_child, height_child_last_recorded,
@@ -782,11 +786,28 @@ class GrowthMonitoringFormsAggregationHelper(BaseICDSAggregationHelper):
               ON ucr.supervisor_id = prev_month.supervisor_id and ucr.case_id = prev_month.case_id
             )
             """.format(
-                ucr_table_query=ucr_query,
                 previous_month_tablename=previous_month_tablename,
                 tablename=tablename,
-                temp_table=temp_tablename
-            ), query_params)]
+                temp_table=self.temp_tablename
+            ), query_params
+
+    def temp_table_columns(self):
+        return [
+            ('case_id', 'text'),
+            ('supervisor_id', 'text'),
+            ('weight_child', 'numeric'),
+            ('weight_child_last_recorded', 'timestamp'),
+            ('height_child', 'numeric'),
+            ('height_child_last_recorded', 'timestamp'),
+            ('zscore_grading_wfa', 'smallint'),
+            ('zscore_grading_wfa_last_recorded', 'timestamp'),
+            ('zscore_grading_hfa', 'smallint'),
+            ('zscore_grading_hfa_last_recorded', 'timestamp'),
+            ('zscore_grading_wfh', 'smallint'),
+            ('zscore_grading_wfh_last_recorded', 'timestamp'),
+            ('muac_grading', 'smallint'),
+            ('muac_grading_last_recorded', 'timestamp')
+        ]
 
     def compare_with_old_data_query(self):
         # only partially implements this comparison for now
