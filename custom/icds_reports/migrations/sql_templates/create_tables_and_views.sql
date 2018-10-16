@@ -414,6 +414,7 @@ CREATE TABLE daily_attendance
 (
   doc_id text NOT NULL,
   awc_id text,
+  supervisor_id text,
   month date,
   pse_date date,
   awc_open_count integer,
@@ -423,6 +424,6 @@ CREATE TABLE daily_attendance
   attended_children_percent numeric,
   form_location text,
   form_location_lat numeric,
-  form_location_long numeric,
-  CONSTRAINT daily_attendance_pkey PRIMARY KEY (doc_id)
-);
+  form_location_long numeric
+--   CONSTRAINT daily_attendance_pkey PRIMARY KEY (supervisor_id, doc_id)
+) PARTITION BY LIST(month);

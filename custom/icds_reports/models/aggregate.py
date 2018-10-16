@@ -19,7 +19,7 @@ from custom.icds_reports.const import (
     AGG_GROWTH_MONITORING_TABLE,
     AGG_CCS_RECORD_DELIVERY_TABLE,
     AGG_INFRASTRUCTURE_TABLE,
-)
+    AGG_DAILY_ATTENDANCE)
 from custom.icds_reports.utils.aggregation import (
     BirthPreparednessFormsAggregationHelper,
     AggChildHealthAggregationHelper,
@@ -35,8 +35,8 @@ from custom.icds_reports.utils.aggregation import (
     InactiveAwwsAggregationHelper,
     DeliveryFormsAggregationHelper,
     AggCcsRecordAggregationHelper,
-    CcsRecordMonthlyAggregationHelper
-)
+    CcsRecordMonthlyAggregationHelper,
+    DailyAttendanceHelper)
 from six.moves import range
 
 
@@ -633,7 +633,16 @@ class DailyAttendance(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'daily_attendance'
+        db_table = AGG_DAILY_ATTENDANCE
+
+    @classmethod
+    def aggregate(cls, day):
+        helper = DailyAttendanceHelper(day)
+
+        with get_cursor(cls) as cursor:
+            cursor.execute(*helper.create_table_query())
+            cursor.execute(*helper.drop_table_query())
+            cursor.execute(*helper.aggregation_query())
 
 
 def get_cursor(model):

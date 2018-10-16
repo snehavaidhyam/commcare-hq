@@ -57,7 +57,7 @@ from custom.icds_reports.models import (
     ChildHealthMonthly,
     CcsRecordMonthly,
     UcrTableNameMapping)
-from custom.icds_reports.models.aggregate import AggregateInactiveAWW
+from custom.icds_reports.models.aggregate import AggregateInactiveAWW, DailyAttendance
 from custom.icds_reports.models.helper import IcdsFile
 from custom.icds_reports.reports.disha import build_dumps_for_month
 from custom.icds_reports.reports.issnip_monthly_register import ISSNIPMonthlyReport
@@ -214,7 +214,7 @@ def move_ucr_data_into_aggregation_tables(date=None, intervals=2):
             ])
             stage_1_tasks.append(icds_aggregation_task.si(date=calculation_date, func=_update_months_table))
             res = group(*stage_1_tasks).apply_async()
-            res_daily = icds_aggregation_task.delay(date=calculation_date, func=_daily_attendance_table)
+            res_daily = icds_aggregation_task.delay(date=monthly_date, func=_daily_attendance_table)
             res.get()
 
             res_child = chain(
@@ -423,10 +423,11 @@ def _ccs_record_monthly_table(day):
 
 @track_time
 def _daily_attendance_table(day):
-    _run_custom_sql_script([
-        "SELECT create_new_table_for_month('daily_attendance', %s)",
-        "SELECT insert_into_daily_attendance(%s)"
-    ], day)
+    DailyAttendance.aggregate(day)
+    # _run_custom_sql_script([
+    #     "SELECT create_new_table_for_month('daily_attendance', %s)",
+    #     "SELECT insert_into_daily_attendance(%s)"
+    # ], day)
 
 
 @track_time

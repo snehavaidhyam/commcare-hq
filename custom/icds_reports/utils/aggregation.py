@@ -25,7 +25,7 @@ from custom.icds_reports.const import (
     AGG_GROWTH_MONITORING_TABLE,
     AGG_INFRASTRUCTURE_TABLE,
     DASHBOARD_DOMAIN,
-)
+    AGG_DAILY_ATTENDANCE)
 from six.moves import range
 from six.moves import map
 
@@ -1042,6 +1042,55 @@ class DeliveryFormsAggregationHelper(BaseICDSAggregationHelper):
             ucr_tablename=self.ucr_tablename,
             tablename=tablename
         ), query_params
+
+
+class DailyAttendanceHelper(BaseICDSAggregationHelper):
+    ucr_data_source_id = 'static-daily_feeding_forms'
+    aggregate_parent_table = AGG_DAILY_ATTENDANCE
+    aggregate_child_table_prefix = 'daily_attendance_'
+
+    def __init__(self, month):
+        self.month = month
+
+    def generate_child_tablename(self, month=None):
+        month = month or self.month
+        month_string = month_formatter(month)
+        return self.aggregate_child_table_prefix + month_string
+
+    def drop_table_query(self):
+        tablename = self.generate_child_tablename()
+        return 'DELETE FROM "{tablename}"'.format(tablename=tablename), {}
+
+    def aggregation_query(self):
+        tablename = self.generate_child_tablename(self.month)
+        return """
+            INSERT INTO "{table_name}" (
+                SELECT DISTINCT ON (awc_id, submitted_on)
+                doc_id,
+                awc_id,
+                supervisor_id,
+                month,
+                submitted_on AS pse_date,
+                awc_open_count,
+                1,
+                eligible_children,
+                attended_children,
+                attended_children_percent,
+                form_location,
+                form_location_lat,
+                form_location_long,
+                image_name,
+                pse_conducted
+                FROM "{ucr_table}"
+                WHERE month = %(month_start)s
+                ORDER BY awc_id, submitted_on, inserted_at DESC
+            )
+        """.format(
+            table_name=tablename,
+            ucr_table=self.ucr_tablename
+        ), {
+            'month_start': month_formatter(self.month)
+        }
 
 
 def recalculate_aggregate_table(model_class):
