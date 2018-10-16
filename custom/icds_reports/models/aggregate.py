@@ -263,6 +263,7 @@ class ChildHealthMonthly(models.Model):
 
         with get_cursor(cls) as cursor:
             with transaction.atomic():
+                cursor.execute(*helper.create_table_query())
                 cursor.execute(*helper.drop_table_query())
                 cursor.execute(agg_query, agg_params)
                 for query in index_queries:

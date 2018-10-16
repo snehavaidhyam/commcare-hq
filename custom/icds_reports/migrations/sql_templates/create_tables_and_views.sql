@@ -245,6 +245,7 @@ CREATE TABLE ccs_record_monthly
 DROP TABLE IF EXISTS child_health_monthly CASCADE;
 CREATE TABLE child_health_monthly
 (
+	supervisor_id text NOT NULL,
 	awc_id text NOT NULL,
 	case_id text NOT NULL,
 	month date NOT NULL,
@@ -287,7 +288,7 @@ CREATE TABLE child_health_monthly
 	counsel_manage_breast_problems integer,
 	counsel_skin_to_skin integer,
 	counsel_immediate_breastfeeding integer
-);
+) PARTITION BY LIST(month);
 
 -- Table: agg_ccs_record
 DROP TABLE IF EXISTS agg_ccs_record CASCADE;

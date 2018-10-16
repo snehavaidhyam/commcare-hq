@@ -1115,9 +1115,16 @@ def recalculate_aggregate_table(model_class):
 
 class ChildHealthMonthlyAggregationHelper(BaseICDSAggregationHelper):
     base_tablename = 'child_health_monthly'
+    aggregate_child_table_prefix = 'child_health_monthly_'
+    aggregate_parent_table = 'child_health_monthly'
 
     def __init__(self, month):
         self.month = transform_day_to_month(month)
+
+    def generate_child_tablename(self, month=None):
+        month = month or self.month
+        month_string = month_formatter(month)
+        return self.aggregate_child_table_prefix + month_string
 
     @property
     def child_health_monthly_ucr_tablename(self):
@@ -1145,7 +1152,7 @@ class ChildHealthMonthlyAggregationHelper(BaseICDSAggregationHelper):
 
     @property
     def tablename(self):
-        return "{}_{}".format(self.base_tablename, self.month.strftime("%Y-%m-%d"))
+        return self.generate_child_tablename()
 
     def drop_table_query(self):
         return 'DELETE FROM "{}"'.format(self.tablename), {}
@@ -1174,6 +1181,7 @@ class ChildHealthMonthlyAggregationHelper(BaseICDSAggregationHelper):
         fully_immun_before_month = "(child_tasks.immun_one_year_date < {})".format(end_month_string)
 
         columns = (
+            ("supervisor_id", "child_health.supervisor_id"),
             ("awc_id", "child_health.awc_id"),
             ("case_id", "child_health.doc_id"),
             ("month", self.month.strftime("'%Y-%m-%d'")),
@@ -1374,13 +1382,13 @@ class ChildHealthMonthlyAggregationHelper(BaseICDSAggregationHelper):
         ) (SELECT
             {calculations}
             FROM "{child_health_case_ucr}" child_health
-            LEFT OUTER JOIN "{child_tasks_case_ucr}" child_tasks ON child_health.doc_id = child_tasks.child_health_case_id
-            LEFT OUTER JOIN "{person_cases_ucr}" person_cases ON child_health.mother_id = person_cases.doc_id
-            LEFT OUTER JOIN "{agg_cf_table}" cf ON child_health.doc_id = cf.case_id AND cf.month = %(start_date)s
-            LEFT OUTER JOIN "{agg_thr_table}" thr ON child_health.doc_id = thr.case_id AND thr.month = %(start_date)s
-            LEFT OUTER JOIN "{agg_gm_table}" gm ON child_health.doc_id = gm.case_id AND gm.month = %(start_date)s
-            LEFT OUTER JOIN "{agg_pnc_table}" pnc ON child_health.doc_id = pnc.case_id AND pnc.month = %(start_date)s
-            LEFT OUTER JOIN "{agg_df_table}" df ON child_health.doc_id = df.case_id AND df.month = %(start_date)s
+            LEFT OUTER JOIN "{child_tasks_case_ucr}" child_tasks ON child_health.doc_id = child_tasks.child_health_case_id AND child_health.supervisor_id = child_tasks.supervisor_id
+            LEFT OUTER JOIN "{person_cases_ucr}" person_cases ON child_health.mother_id = person_cases.doc_id AND child_health.supervisor_id = person_cases.supervisor_id
+            LEFT OUTER JOIN "{agg_cf_table}" cf ON child_health.doc_id = cf.case_id AND cf.month = %(start_date)s AND child_health.supervisor_id = cf.supervisor_id
+            LEFT OUTER JOIN "{agg_thr_table}" thr ON child_health.doc_id = thr.case_id AND thr.month = %(start_date)s AND child_health.supervisor_id = thr.supervisor_id
+            LEFT OUTER JOIN "{agg_gm_table}" gm ON child_health.doc_id = gm.case_id AND gm.month = %(start_date)s AND child_health.supervisor_id = gm.supervisor_id
+            LEFT OUTER JOIN "{agg_pnc_table}" pnc ON child_health.doc_id = pnc.case_id AND pnc.month = %(start_date)s AND child_health.supervisor_id = pnc.supervisor_id
+            LEFT OUTER JOIN "{agg_df_table}" df ON child_health.doc_id = df.case_id AND df.month = %(start_date)s AND child_health.supervisor_id = df.supervisor_id
             WHERE child_health.doc_id IS NOT NULL
             ORDER BY child_health.awc_id, child_health.case_id
         )
@@ -1404,8 +1412,8 @@ class ChildHealthMonthlyAggregationHelper(BaseICDSAggregationHelper):
 
     def indexes(self):
         return [
-            'CREATE INDEX ON "{}" (case_id)'.format(self.tablename),
-            'CREATE INDEX ON "{}" (awc_id)'.format(self.tablename),
+            'CREATE INDEX IF NOT EXISTS "{table}_case_index" ON "{table}" (case_id)'.format(table=self.tablename),
+            'CREATE INDEX IF NOT EXISTS "{table}_awc_index" ON "{table}" (awc_id)'.format(table=self.tablename),
         ]
 
 
