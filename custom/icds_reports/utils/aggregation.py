@@ -1887,7 +1887,7 @@ class CcsRecordMonthlyAggregationHelper(BaseICDSAggregationHelper):
             ('extra_meal', 'ucr.extra_meal'),
             ('resting_during_pregnancy', 'ucr.resting_during_pregnancy'),
             ('bp_visited_in_month', 'ucr.bp_visited_in_month'),
-            ('pnc_visited_in_month', 'NULL'),
+            # ('pnc_visited_in_month', 'NULL'),
             ('trimester_2', 'ucr.trimester_2'),
             ('trimester_3', 'ucr.trimester_3'),
             ('counsel_immediate_bf', 'ucr.counsel_immediate_bf'),
@@ -1902,7 +1902,7 @@ class CcsRecordMonthlyAggregationHelper(BaseICDSAggregationHelper):
             ('pnc_complete', 'ucr.pnc_complete'),
             ('postnatal', 'ucr.postnatal'),
             ('has_aadhar_id', 'ucr.has_aadhar_id'),
-            ('counsel_fp_methods', 'NULL'),
+            # ('counsel_fp_methods', 'NULL'),
             ('pregnant', 'ucr.pregnant'),
             ('pregnant_all', 'ucr.pregnant_all'),
             ('lactating', 'ucr.lactating'),
@@ -1955,24 +1955,29 @@ class CcsRecordMonthlyAggregationHelper(BaseICDSAggregationHelper):
             ('opened_on', 'case_list.opened_on')
         )
         return """
+        CREATE TEMPORARY TABLE "{tablename}_tmp" AS 
+        SELECT
+            {calculations}
+            FROM "{ucr_ccs_record_monthly_table}" ucr
+            LEFT OUTER JOIN "{agg_thr_table}" agg_thr ON ucr.doc_id = agg_thr.case_id AND ucr.month = agg_thr.month and ucr.valid_in_month = 1 and ucr.supervisor_id = agg_thr.supervisor_id
+            LEFT OUTER JOIN "{agg_bp_table}" agg_bp ON ucr.doc_id = agg_bp.case_id AND ucr.month = agg_bp.month and ucr.valid_in_month = 1 and ucr.supervisor_id = agg_bp.supervisor_id
+            LEFT OUTER JOIN "{agg_pnc_table}" agg_pnc ON ucr.doc_id = agg_pnc.case_id AND ucr.month = agg_pnc.month and ucr.valid_in_month = 1 and ucr.supervisor_id = agg_pnc.supervisor_id
+            LEFT OUTER JOIN "{agg_delivery_table}" agg_delivery ON ucr.doc_id = agg_delivery.case_id AND ucr.month = agg_delivery.month and ucr.valid_in_month = 1 and ucr.supervisor_id = agg_delivery.supervisor_id
+            LEFT OUTER JOIN "{ccs_record_case_ucr}" case_list ON ucr.doc_id = case_list.doc_id and ucr.supervisor_id = case_list.supervisor_id
+            LEFT OUTER JOIN "{pregnant_tasks_case_ucr}" ut ON ucr.doc_id = ut.ccs_record_case_id and ucr.supervisor_id = ut.supervisor_id
+            WHERE ucr.month = %(start_date)s;
+
         INSERT INTO "{tablename}" (
             {columns}
         ) (SELECT
-            {calculations}
-            FROM "{ucr_ccs_record_monthly_table}" ucr
-            LEFT OUTER JOIN "{agg_thr_table}" agg_thr ON ucr.doc_id = agg_thr.case_id AND ucr.month = agg_thr.month and ucr.valid_in_month = 1
-            LEFT OUTER JOIN "{agg_bp_table}" agg_bp ON ucr.doc_id = agg_bp.case_id AND ucr.month = agg_bp.month and ucr.valid_in_month = 1
-            LEFT OUTER JOIN "{agg_pnc_table}" agg_pnc ON ucr.doc_id = agg_pnc.case_id AND ucr.month = agg_pnc.month and ucr.valid_in_month = 1
-            LEFT OUTER JOIN "{agg_delivery_table}" agg_delivery ON ucr.doc_id = agg_delivery.case_id AND ucr.month = agg_delivery.month and ucr.valid_in_month = 1
-            LEFT OUTER JOIN "{ccs_record_case_ucr}" case_list ON ucr.doc_id = case_list.doc_id
-            LEFT OUTER JOIN "{pregnant_tasks_case_ucr}" ut ON ucr.doc_id = ut.ccs_record_case_id
-            WHERE ucr.month = %(start_date)s
+            *
+            FROM "{tablename}_tmp" ucr
             ORDER BY ucr.awc_id, ucr.case_id
         )
         """.format(
             tablename=self.tablename,
             columns=", ".join([col[0] for col in columns]),
-            calculations=", ".join([col[1] for col in columns]),
+            calculations=", ".join(["{1} as {0}".format(*col) if 'as' not in col[1] else col[1] for col in columns]),
             ucr_ccs_record_monthly_table=self.ccs_record_monthly_ucr_tablename,
             agg_thr_table=AGG_CCS_RECORD_THR_TABLE,
             ccs_record_case_ucr=self.ccs_record_case_ucr_tablename,
