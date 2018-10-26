@@ -1568,7 +1568,7 @@ class AggChildHealthAggregationHelper(BaseICDSAggregationHelper):
             ('district_id', 'awc_loc.district_id'),
             ('block_id', 'awc_loc.block_id'),
             ('supervisor_id', 'awc_loc.supervisor_id'),
-            ('awc_id', 'chm.awc_id'),
+            ('awc_id', 'awc_loc.doc_id'),
             ('month', 'chm.month'),
             ('gender', 'chm.sex'),
             ('age_tranche', 'chm.age_tranche'),
@@ -1666,22 +1666,28 @@ class AggChildHealthAggregationHelper(BaseICDSAggregationHelper):
             ('days_ration_given_child', "SUM(chm.days_ration_given_child)"),
         )
         return """
+        CREATE TEMPORARY TABLE tmp AS 
+        SELECT
+            *
+            FROM "{child_health_monthly_table}" chm
+            WHERE chm.month = %(start_date)s;
+
         INSERT INTO "{tablename}" (
             {columns}
-        ) (SELECT
+        ) (SELECT 
             {calculations}
-            FROM "{child_health_monthly_table}" chm
+            from tmp chm
             LEFT OUTER JOIN "awc_location" awc_loc ON awc_loc.doc_id = chm.awc_id
-            WHERE chm.month = %(start_date)s AND awc_loc.state_id != '' AND awc_loc.state_id IS NOT NULL
-            GROUP BY awc_loc.state_id, awc_loc.district_id, awc_loc.block_id, awc_loc.supervisor_id, chm.awc_id,
-                     chm.month, chm.sex, chm.age_tranche, chm.caste,
-                     coalesce_disabled, coalesce_minority, coalesce_resident
-            ORDER BY awc_loc.state_id, awc_loc.district_id, awc_loc.block_id, awc_loc.supervisor_id, chm.awc_id
-        )
+            WHERE awc_loc.state_id != '' AND awc_loc.state_id IS NOT NULL
+            GROUP BY awc_loc.state_id, awc_loc.district_id, awc_loc.block_id, awc_loc.supervisor_id, awc_loc.doc_id,
+                chm.month, chm.sex, chm.age_tranche, chm.caste,
+                coalesce_disabled, coalesce_minority, coalesce_resident
+            ORDER BY awc_loc.state_id, awc_loc.district_id, awc_loc.block_id, awc_loc.supervisor_id, awc_loc.doc_id
+        );
         """.format(
             tablename=self.tablename,
             columns=", ".join([col[0] for col in columns]),
-            calculations=", ".join([col[1] for col in columns]),
+            calculations=", ".join(['{1} as {0}'.format(*col) if ' as ' not in col[1].lower() else col[1] for col in columns]),
             ucr_child_monthly_table=self.child_health_monthly_ucr_tablename,
             child_health_monthly_table='child_health_monthly',
         ), {
