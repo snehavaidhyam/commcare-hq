@@ -1977,7 +1977,7 @@ class CcsRecordMonthlyAggregationHelper(BaseICDSAggregationHelper):
         """.format(
             tablename=self.tablename,
             columns=", ".join([col[0] for col in columns]),
-            calculations=", ".join(["{1} as {0}".format(*col) if 'as' not in col[1] else col[1] for col in columns]),
+            calculations=", ".join(_calc_tuple_to_select_as(columns)),
             ucr_ccs_record_monthly_table=self.ccs_record_monthly_ucr_tablename,
             agg_thr_table=AGG_CCS_RECORD_THR_TABLE,
             ccs_record_case_ucr=self.ccs_record_case_ucr_tablename,
@@ -2074,19 +2074,21 @@ class AggCcsRecordAggregationHelper(BaseICDSAggregationHelper):
             ('pregnant_all', 'sum(ucr.pregnant_all)'),
         )
         return """
-        INSERT INTO "{tablename}" (
-            {columns}
-        ) (SELECT
+        CREATE TEMPORARY TABLE "{tablename}_tmp" AS 
+        SELECT
             {calculations}
             FROM "{ucr_ccs_record_table}" ucr
             WHERE month = %(start_date)s AND state_id != ''
             GROUP BY state_id, district_id, block_id, supervisor_id, awc_id, month,
-                     ccs_status, coalesce_trimester, caste, coalesce_disabled, coalesce_minority, coalesce_resident
-        )
+                     ccs_status, coalesce_trimester, caste, coalesce_disabled, coalesce_minority, coalesce_resident;
+                     
+        INSERT INTO "{tablename}" (
+            {columns}
+        ) (SELECT * FROM "{tablename}_tmp")
         """.format(
             tablename=self.tablename,
             columns=", ".join([col[0] for col in columns]),
-            calculations=", ".join([col[1] for col in columns]),
+            calculations=", ".join(_calc_tuple_to_select_as(columns)),
             ucr_ccs_record_table=self.ccs_record_monthly_ucr_tablename
         ), {
             "start_date": self.month
@@ -2312,3 +2314,6 @@ class AwcInfrastructureAggregationHelper(BaseICDSAggregationHelper):
             tablename=tablename
         ), query_params
 
+
+def _calc_tuple_to_select_as(calculation_tuples):
+    return ["{1} as {0}".format(*col) if ' as ' not in col[1].lower() else col[1] for col in calculation_tuples]
