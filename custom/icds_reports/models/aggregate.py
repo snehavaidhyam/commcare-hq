@@ -36,7 +36,7 @@ from custom.icds_reports.utils.aggregation import (
     DeliveryFormsAggregationHelper,
     AggCcsRecordAggregationHelper,
     CcsRecordMonthlyAggregationHelper,
-    DailyAttendanceHelper, AggAwcHelper)
+    DailyAttendanceHelper, AggAwcHelper, AggAwcDailyAggregationHelper)
 from six.moves import range
 
 
@@ -632,6 +632,24 @@ class AggAwcDaily(models.Model):
     class Meta:
         managed = False
         db_table = 'agg_awc_daily'
+
+    @classmethod
+    def aggregate(cls, month):
+        helper = AggAwcDailyAggregationHelper(month)
+        agg_query, agg_params = helper.aggregation_query()
+        update_query, update_params = helper.update_query()
+        rollup_queries = [helper.rollup_query(i) for i in range(4, 0, -1)]
+        index_queries = helper.indexes()
+        with get_cursor(cls) as cursor:
+            with transaction.atomic():
+                cursor.execute(helper.drop_table_query())
+                cursor.execute(*helper.create_table_query())
+                cursor.execute(agg_query, agg_params)
+                cursor.execute(update_query, update_params)
+                for query in rollup_queries:
+                    cursor.execute(query)
+                for query in index_queries:
+                    cursor.execute(query)
 
 
 class DailyAttendance(models.Model):
