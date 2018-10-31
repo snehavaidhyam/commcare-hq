@@ -57,7 +57,7 @@ from custom.icds_reports.models import (
     ChildHealthMonthly,
     CcsRecordMonthly,
     UcrTableNameMapping)
-from custom.icds_reports.models.aggregate import AggregateInactiveAWW, DailyAttendance
+from custom.icds_reports.models.aggregate import AggregateInactiveAWW, DailyAttendance, AggAwc
 from custom.icds_reports.models.helper import IcdsFile
 from custom.icds_reports.reports.disha import build_dumps_for_month
 from custom.icds_reports.reports.issnip_monthly_register import ISSNIPMonthlyReport
@@ -452,8 +452,10 @@ def _agg_ccs_record_table(day):
 def _agg_awc_table(day):
     _run_custom_sql_script([
         "SELECT create_new_aggregate_table_for_month('agg_awc', %s)",
-        "SELECT aggregate_awc_data(%s)"
+        # "SELECT aggregate_awc_data(%s)"
     ], day)
+    AggAwc.aggregate(force_to_date(day))
+
 
 
 @track_time

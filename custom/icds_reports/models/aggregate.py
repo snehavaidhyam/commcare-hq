@@ -36,7 +36,7 @@ from custom.icds_reports.utils.aggregation import (
     DeliveryFormsAggregationHelper,
     AggCcsRecordAggregationHelper,
     CcsRecordMonthlyAggregationHelper,
-    DailyAttendanceHelper)
+    DailyAttendanceHelper, AggAwcHelper)
 from six.moves import range
 
 
@@ -410,6 +410,23 @@ class AggAwc(models.Model):
         managed = False
         db_table = 'agg_awc'
 
+    @classmethod
+    def aggregate(cls, month):
+        helper = AggAwcHelper(month)
+        agg_query, agg_params = helper.aggregation_query()
+        update_queries = helper.updates()
+        rollup_queries = [helper.rollup_query(i) for i in range(4, 0, -1)]
+        index_queries = [helper.indexes(i) for i in range(5, 0, -1)]
+        index_queries = [query for index_list in index_queries for query in index_list]
+
+        with get_cursor(cls) as cursor:
+            cursor.execute(agg_query, agg_params)
+            for query, params in update_queries:
+                cursor.execute(query, params)
+            for query in rollup_queries:
+                cursor.execute(query)
+            for query in index_queries:
+                cursor.execute(query)
 
 class AggCcsRecord(models.Model):
     state_id = models.TextField()
