@@ -104,10 +104,11 @@ def setUpModule():
 
         for adapter in adapters:
             try:
-                adapter.drop_table()
+                adapter.clear_table()
+                # adapter.drop_table()
             except Exception:
                 pass
-            adapter.build_table()
+            # adapter.build_table()
 
         engine = connection_manager.get_engine(ICDS_UCR_ENGINE_ID)
         metadata = sqlalchemy.MetaData(bind=engine)

@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 import warnings
 import hashlib
 from quickcache.django_quickcache import get_django_quickcache
-from quickcache import ForceSkipCache
+from quickcache import ForceSkipCache, QuickCacheHelper
 from celery._state import get_current_task
 from corehq.util.global_request import get_request
 
@@ -43,9 +43,14 @@ def get_session_key():
         raise ForceSkipCache("Not part of a session")
 
 
+class FakeHelper(QuickCacheHelper):
+    def call(self, *args, **kwargs):
+        return self.fn(*args, **kwargs)
+
+
 quickcache = get_django_quickcache(timeout=5 * 60, memoize_timeout=10,
                                    assert_function=quickcache_soft_assert,
-                                   session_function=get_session_key)
+                                   session_function=get_session_key).but_with(helper_class=FakeHelper)
 
 
 def skippable_quickcache(*args, **kwargs):

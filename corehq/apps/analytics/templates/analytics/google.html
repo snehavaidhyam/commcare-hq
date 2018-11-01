@@ -1,4 +1,3 @@
-{% if ANALYTICS_IDS.GOOGLE_ANALYTICS_API_ID %}
 {# This is fine as an inline script; it's independent of all HQ code and all third-party libraries #}
 {# This is only used in the ICDS Dashboard to avoid a full google tag manager setup, and to get around the sitewide disabling of analytics #}
 <!-- Google Analytics -->
@@ -9,7 +8,10 @@ m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
 })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
 
 ga('create', '{{ ANALYTICS_IDS.GOOGLE_ANALYTICS_API_ID }}', 'auto');
+if (location.hostname == 'localhost') {
+    console.log('Disabling Google Analytics on localhost');
+    ga('set', 'sendHitTask', null);
+}
 ga('send', 'pageview');
 </script>
 <!-- End Google Analytics -->
-{% endif %}
