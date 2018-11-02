@@ -1481,6 +1481,9 @@ class InactiveAwwsAggregationHelper(BaseICDSAggregationHelper):
     def aggregate_query(self):
         ucr_query, params = self.data_from_ucr_query()
         return """
+            CREATE TEMPORARY TABLE "{tmp_table}" AS (
+                {ucr_table_query}
+            );
             UPDATE "{table_name}" AS agg_table SET
                 first_submission = LEAST(agg_table.first_submission, ut.first_submission),
                 last_submission = GREATEST(agg_table.last_submission, ut.last_submission)
@@ -1489,7 +1492,7 @@ class InactiveAwwsAggregationHelper(BaseICDSAggregationHelper):
                 loc.doc_id as awc_id,
                 ucr.first_submission as first_submission,
                 ucr.last_submission as last_submission
-              FROM ({ucr_table_query}) ucr
+              FROM "{tmp_table}" ucr
               JOIN "{awc_location_table_name}" loc
               ON ucr.awc_id = loc.doc_id
             ) ut
@@ -1498,6 +1501,7 @@ class InactiveAwwsAggregationHelper(BaseICDSAggregationHelper):
             table_name=self.aggregate_parent_table,
             ucr_table_query=ucr_query,
             awc_location_table_name='awc_location',
+            tmp_table=uuid.uuid4().hex
         ), params
 
 
