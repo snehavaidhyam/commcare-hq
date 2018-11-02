@@ -91,7 +91,7 @@ class AggregationScriptTestBase(TestCase):
 
     def _fasterAssertListEqual(self, list1, list2):
         if len(list1) != len(list2):
-            self.fail('Lists are not equal')
+            self.fail('Lists are not equal: {} != {}'.format(len(list1), len(list2)))
 
         messages = []
 
