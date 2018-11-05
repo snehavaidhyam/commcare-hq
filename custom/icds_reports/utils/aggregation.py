@@ -592,7 +592,7 @@ class THRFormsChildHealthAggregationHelper(BaseICDSAggregationHelper):
                 timeend >= %(current_month_start)s AND timeend < %(next_month_start)s AND
                 child_health_case_id IS NOT NULL
           WINDOW w AS (
-            PARTITION BY supervisor_id, ccs_record_case_id
+            PARTITION BY supervisor_id, child_health_case_id
             ORDER BY timeend RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
           )
         )
