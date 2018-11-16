@@ -354,7 +354,10 @@ def update_linked_app(app, user_id):
                 'Error fetching multimedia from remote server. Please try again later.'
             ))
 
-    app.domain_link.update_last_pull('app', user_id, model_details=AppLinkDetail(app_id=app._id))
+    app.domain_link.update_last_pull('app', user_id, model_details=AppLinkDetail(
+        app_id=app._id,
+        app_version=app.version,
+    ))
 
     # reapply linked application specific data
     app.reapply_overrides()

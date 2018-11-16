@@ -123,6 +123,7 @@ class DomainLinkHistory(models.Model):
 
 class AppLinkDetail(jsonobject.JsonObject):
     app_id = jsonobject.StringProperty()
+    app_version = jsonobject.IntegerProperty()
 
 
 def wrap_detail(model, detail_json):

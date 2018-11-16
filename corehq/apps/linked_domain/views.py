@@ -314,7 +314,7 @@ class DomainLinkHistoryReport(GenericTabularReport):
         if detail:
             app_names = self.linked_app_names(self.selected_link.linked_domain)
             app_name = app_names.get(detail.app_id, detail.app_id)
-        return '{} ({})'.format(name, app_name)
+        return '{} ({} v{})'.format(name, app_name, detail.app_version or '?')
 
     @property
     def headers(self):
