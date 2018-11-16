@@ -290,7 +290,7 @@ class DomainLinkHistoryReport(GenericTabularReport):
 
     def _make_row(self, record, link):
         row = [
-            '{} -> {}'.format(link.master_domain, link.linked_domain),
+            '{} -> {}'.format(link.qualified_master, link.linked_domain),
             server_to_user_time(record.date, self.timezone),
             self._make_model_cell(record),
             pretty_doc_info(get_doc_info_by_id(self.domain, record.user_id))
