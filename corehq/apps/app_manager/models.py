@@ -1353,7 +1353,7 @@ class FormBase(DocumentSchema, HasMediaMixin):
             updates_by_case_type[case_type].update(save_to_case_update.properties)
         return updates_by_case_type
 
-    def all_media(self):
+    def all_media(self):    # form
         module = self.get_module()
         media_kwargs = self.get_media_ref_kwargs(module.get_app().default_language, module, form=self)
         media = []
@@ -2757,8 +2757,43 @@ class ModuleBase(IndexedSchema, HasMediaMixin, NavMenuItemMediaMixin, CommentMix
         """
         return True
 
-    def all_media(self):
-        return []
+    def all_media(self):    # module
+        media = []
+        media_kwargs = self.get_media_ref_kwargs(self.get_app().default_language, self)
+
+        for name, details, display in self.get_details():
+            # Case list lookup android callout
+            if display and details.display == 'short' and details.lookup_enabled and details.lookup_image:
+                media.append(ApplicationMediaReference(
+                    details.lookup_image,
+                    media_class=CommCareImage,
+                    **media_kwargs)
+                )
+
+            # Icons in case details
+            for column in details.get_columns():
+                if column.format == 'enum-image':
+                    for map_item in column.enum:
+                        # iterate over icons of each lang
+                        icons = list(map_item.value.values())
+                        media.extend([ApplicationMediaReference(
+                            icon,
+                            media_class=CommCareImage,
+                            is_menu_media=True,
+                            **media_kwargs)
+                            for icon in icons
+                            if icon]
+                        )
+
+            # Print template
+            if display and details.display == 'long' and details.print_template:
+                media.append(ApplicationMediaReference(
+                    details.print_template['path'],
+                    media_class=CommCareMultimedia,
+                    **media_kwargs)
+                )
+
+        return media
 
     def uses_usercase(self):
         return False
@@ -6316,7 +6351,7 @@ class Application(ApplicationBase, TranslationMixin, HasMediaMixin, HQMediaMixin
     def has_media(self):
         return len(self.multimedia_map) > 0
 
-    def all_media(self):
+    def all_media(self):    # application
         """
             Get all the paths of multimedia IMAGES and AUDIO referenced in this application.
             (Video and anything else is currently not supported...)
@@ -6349,35 +6384,6 @@ class Application(ApplicationBase, TranslationMixin, HasMediaMixin, HQMediaMixin
                 'app_lang': self.default_language,
             }
             _add_menu_media(module, **media_kwargs)
-
-            for name, details, display in module.get_details():
-                if display and details.display == 'short' and details.lookup_enabled and details.lookup_image:
-                    media.append(ApplicationMediaReference(
-                        details.lookup_image,
-                        media_class=CommCareImage,
-                        **media_kwargs)
-                    )
-                # Icons in case-details
-                for column in details.get_columns():
-                    if column.format == 'enum-image':
-                        for map_item in column.enum:
-                            # iterate over icons of each lang
-                            icons = list(map_item.value.values())
-                            media.extend([ApplicationMediaReference(
-                                icon,
-                                media_class=CommCareImage,
-                                is_menu_media=True,
-                                **media_kwargs)
-                                for icon in icons
-                                if icon]
-                            )
-                # Print template
-                if display and details.display == 'long' and details.print_template:
-                    media.append(ApplicationMediaReference(
-                        details.print_template['path'],
-                        media_class=CommCareMultimedia,
-                        **media_kwargs)
-                    )
 
             if module.case_list_form.form_id:
                 _add_menu_media(module.case_list_form, **media_kwargs)
