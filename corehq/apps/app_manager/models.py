@@ -99,7 +99,15 @@ from corehq.util import bitly
 from corehq.util import view_utils
 from corehq.apps.appstore.models import SnapshotMixin
 from corehq.apps.builds.models import BuildSpec, BuildRecord
-from corehq.apps.hqmedia.models import HasMediaMixin, HQMediaMixin, CommCareMultimedia
+from corehq.apps.hqmedia.models import (
+    ApplicationMediaReference,
+    CommCareAudio,
+    CommCareImage,
+    CommCareMultimedia,
+    CommCareVideo,
+    HasMediaMixin,
+    HQMediaMixin,
+)
 from corehq.apps.translations.models import TranslationMixin
 from corehq.apps.users.util import cc_user_domain
 from corehq.apps.domain.models import cached_property, Domain
@@ -6278,6 +6286,97 @@ class Application(ApplicationBase, TranslationMixin, HasMediaMixin, HQMediaMixin
 
     def has_media(self):
         return len(self.multimedia_map) > 0
+
+    def all_media(self):
+        """
+            Get all the paths of multimedia IMAGES and AUDIO referenced in this application.
+            (Video and anything else is currently not supported...)
+        """
+        media = []
+        #self.media_form_errors = False
+
+        def _add_menu_media(item, **kwargs):
+            media.extend([ApplicationMediaReference(image,
+                                                    media_class=CommCareImage,
+                                                    is_menu_media=True, **kwargs)
+                          for image in item.all_image_paths()
+                          if image])
+
+            media.extend([ApplicationMediaReference(audio,
+                                                    media_class=CommCareAudio,
+                                                    is_menu_media=True, **kwargs)
+                          for audio in item.all_audio_paths()
+                          if audio])
+
+        for m, module in enumerate([m for m in self.get_modules() if m.uses_media()]):
+            media_kwargs = {
+                'module_name': module.name,
+                'module_id': m,
+                'app_lang': self.default_language,
+            }
+            _add_menu_media(module, **media_kwargs)
+
+            for name, details, display in module.get_details():
+                if display and details.display == 'short' and details.lookup_enabled and details.lookup_image:
+                    media.append(ApplicationMediaReference(
+                        details.lookup_image,
+                        media_class=CommCareImage,
+                        **media_kwargs)
+                    )
+                # Icons in case-details
+                for column in details.get_columns():
+                    if column.format == 'enum-image':
+                        for map_item in column.enum:
+                            # iterate over icons of each lang
+                            icons = list(map_item.value.values())
+                            media.extend([ApplicationMediaReference(
+                                icon,
+                                media_class=CommCareImage,
+                                is_menu_media=True,
+                                **media_kwargs)
+                                for icon in icons
+                                if icon]
+                            )
+                # Print template
+                if display and details.display == 'long' and details.print_template:
+                    media.append(ApplicationMediaReference(
+                        details.print_template['path'],
+                        media_class=CommCareMultimedia,
+                        **media_kwargs)
+                    )
+
+            if module.case_list_form.form_id:
+                _add_menu_media(module.case_list_form, **media_kwargs)
+
+            if hasattr(module, 'case_list') and module.case_list.show:
+                _add_menu_media(module.case_list, **media_kwargs)
+
+            for f_order, f in enumerate(module.get_forms()):
+                media_kwargs['form_name'] = f.name
+                media_kwargs['form_id'] = f.unique_id
+                media_kwargs['form_order'] = f_order
+                _add_menu_media(f, **media_kwargs)
+                try:
+                    parsed = f.wrapped_xform()
+                    if not parsed.exists():
+                        continue
+                    f.validate_form()
+                    for image in parsed.image_references:
+                        if image:
+                            media.append(ApplicationMediaReference(image, media_class=CommCareImage, **media_kwargs))
+                    for audio in parsed.audio_references:
+                        if audio:
+                            media.append(ApplicationMediaReference(audio, media_class=CommCareAudio, **media_kwargs))
+                    for video in parsed.video_references:
+                        if video:
+                            media.append(ApplicationMediaReference(video, media_class=CommCareVideo, **media_kwargs))
+                    for text in parsed.text_references:
+                        if text:
+                            media.append(ApplicationMediaReference(text, media_class=CommCareMultimedia, **media_kwargs))
+                except (XFormValidationError, XFormException):
+                    pass
+                    #self.media_form_errors = True
+        return media
 
     @memoized
     def get_xmlns_map(self):

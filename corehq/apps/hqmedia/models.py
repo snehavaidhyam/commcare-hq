@@ -541,7 +541,10 @@ def _log_media_deletion(app, deleted_media):
 
 
 class HasMediaMixin(object):
-    pass
+    @memoized
+    def all_media(self):
+        # Get all of the ApplicationMediaReference objects referenced in this application
+        raise notImplementedError()
 
 
 class HQMediaMixin(Document):
@@ -557,97 +560,6 @@ class HQMediaMixin(Document):
     logo_refs = DictProperty()
 
     archived_media = DictProperty()  # where we store references to the old logos (or other multimedia) on a downgrade, so that information is not lost
-
-    @memoized
-    def all_media(self):
-        """
-            Get all the paths of multimedia IMAGES and AUDIO referenced in this application.
-            (Video and anything else is currently not supported...)
-        """
-        media = []
-        self.media_form_errors = False
-
-        def _add_menu_media(item, **kwargs):
-            media.extend([ApplicationMediaReference(image,
-                                                    media_class=CommCareImage,
-                                                    is_menu_media=True, **kwargs)
-                          for image in item.all_image_paths()
-                          if image])
-
-            media.extend([ApplicationMediaReference(audio,
-                                                    media_class=CommCareAudio,
-                                                    is_menu_media=True, **kwargs)
-                          for audio in item.all_audio_paths()
-                          if audio])
-
-        for m, module in enumerate([m for m in self.get_modules() if m.uses_media()]):
-            media_kwargs = {
-                'module_name': module.name,
-                'module_id': m,
-                'app_lang': self.default_language,
-            }
-            _add_menu_media(module, **media_kwargs)
-
-            for name, details, display in module.get_details():
-                if display and details.display == 'short' and details.lookup_enabled and details.lookup_image:
-                    media.append(ApplicationMediaReference(
-                        details.lookup_image,
-                        media_class=CommCareImage,
-                        **media_kwargs)
-                    )
-                # Icons in case-details
-                for column in details.get_columns():
-                    if column.format == 'enum-image':
-                        for map_item in column.enum:
-                            # iterate over icons of each lang
-                            icons = list(map_item.value.values())
-                            media.extend([ApplicationMediaReference(
-                                icon,
-                                media_class=CommCareImage,
-                                is_menu_media=True,
-                                **media_kwargs)
-                                for icon in icons
-                                if icon]
-                            )
-                # Print template
-                if display and details.display == 'long' and details.print_template:
-                    media.append(ApplicationMediaReference(
-                        details.print_template['path'],
-                        media_class=CommCareMultimedia,
-                        **media_kwargs)
-                    )
-
-            if module.case_list_form.form_id:
-                _add_menu_media(module.case_list_form, **media_kwargs)
-
-            if hasattr(module, 'case_list') and module.case_list.show:
-                _add_menu_media(module.case_list, **media_kwargs)
-
-            for f_order, f in enumerate(module.get_forms()):
-                media_kwargs['form_name'] = f.name
-                media_kwargs['form_id'] = f.unique_id
-                media_kwargs['form_order'] = f_order
-                _add_menu_media(f, **media_kwargs)
-                try:
-                    parsed = f.wrapped_xform()
-                    if not parsed.exists():
-                        continue
-                    f.validate_form()
-                    for image in parsed.image_references:
-                        if image:
-                            media.append(ApplicationMediaReference(image, media_class=CommCareImage, **media_kwargs))
-                    for audio in parsed.audio_references:
-                        if audio:
-                            media.append(ApplicationMediaReference(audio, media_class=CommCareAudio, **media_kwargs))
-                    for video in parsed.video_references:
-                        if video:
-                            media.append(ApplicationMediaReference(video, media_class=CommCareVideo, **media_kwargs))
-                    for text in parsed.text_references:
-                        if text:
-                            media.append(ApplicationMediaReference(text, media_class=CommCareMultimedia, **media_kwargs))
-                except (XFormValidationError, XFormException):
-                    self.media_form_errors = True
-        return media
 
     def get_menu_media(self, module, module_index, form=None, form_index=None, to_language=None):
         if not module:
@@ -873,7 +785,7 @@ class HQMediaMixin(Document):
 
         return {
             "has_media": bool(self.all_media()),
-            "has_form_errors": self.media_form_errors,
+            "has_form_errors": False, #self.media_form_errors, # TODO: handle media_form_errors
             "has_missing_refs": has_missing_refs,
         }
 
