@@ -1353,6 +1353,32 @@ class FormBase(DocumentSchema, HasMediaMixin):
             updates_by_case_type[case_type].update(save_to_case_update.properties)
         return updates_by_case_type
 
+    def all_media(self):
+        module = self.get_module()
+        media_kwargs = self.get_media_ref_kwargs(module.get_app().default_language, module, form=self)
+        media = []
+        try:
+            parsed = self.wrapped_xform()
+            if not parsed.exists():
+                return []
+            self.validate_form()
+            for image in parsed.image_references:
+                if image:
+                    media.append(ApplicationMediaReference(image, media_class=CommCareImage, **media_kwargs))
+            for audio in parsed.audio_references:
+                if audio:
+                    media.append(ApplicationMediaReference(audio, media_class=CommCareAudio, **media_kwargs))
+            for video in parsed.video_references:
+                if video:
+                    media.append(ApplicationMediaReference(video, media_class=CommCareVideo, **media_kwargs))
+            for text in parsed.text_references:
+                if text:
+                    media.append(ApplicationMediaReference(text, media_class=CommCareMultimedia, **media_kwargs))
+        except (XFormValidationError, XFormException):
+            pass
+            #self.media_form_errors = True
+        return media
+
 
 class IndexedFormBase(FormBase, IndexedSchema, CommentMixin):
 
@@ -2730,6 +2756,9 @@ class ModuleBase(IndexedSchema, HasMediaMixin, NavMenuItemMediaMixin, CommentMix
         for the module.
         """
         return True
+
+    def all_media(self):
+        return []
 
     def uses_usercase(self):
         return False
@@ -6295,6 +6324,11 @@ class Application(ApplicationBase, TranslationMixin, HasMediaMixin, HQMediaMixin
         media = []
         #self.media_form_errors = False
 
+        for index, module in enumerate([m for m in self.get_modules() if m.uses_media()]):
+            media += module.all_media()
+            for index, form in enumerate(module.get_forms()):
+                media += form.all_media()
+
         def _add_menu_media(item, **kwargs):
             media.extend([ApplicationMediaReference(image,
                                                     media_class=CommCareImage,
@@ -6356,26 +6390,6 @@ class Application(ApplicationBase, TranslationMixin, HasMediaMixin, HQMediaMixin
                 media_kwargs['form_id'] = f.unique_id
                 media_kwargs['form_order'] = f_order
                 _add_menu_media(f, **media_kwargs)
-                try:
-                    parsed = f.wrapped_xform()
-                    if not parsed.exists():
-                        continue
-                    f.validate_form()
-                    for image in parsed.image_references:
-                        if image:
-                            media.append(ApplicationMediaReference(image, media_class=CommCareImage, **media_kwargs))
-                    for audio in parsed.audio_references:
-                        if audio:
-                            media.append(ApplicationMediaReference(audio, media_class=CommCareAudio, **media_kwargs))
-                    for video in parsed.video_references:
-                        if video:
-                            media.append(ApplicationMediaReference(video, media_class=CommCareVideo, **media_kwargs))
-                    for text in parsed.text_references:
-                        if text:
-                            media.append(ApplicationMediaReference(text, media_class=CommCareMultimedia, **media_kwargs))
-                except (XFormValidationError, XFormException):
-                    pass
-                    #self.media_form_errors = True
         return media
 
     @memoized

@@ -546,6 +546,17 @@ class HasMediaMixin(object):
         # Get all of the ApplicationMediaReference objects referenced in this application
         raise notImplementedError()
 
+    def get_media_ref_kwargs(self, lang, module, form=None, is_menu_media=False):
+        return {
+            'app_lang': lang,
+            'module_name': module.name,
+            'module_id': module.id,
+            'form_name': form.name if form else None,
+            'form_id': form.unique_id if form else None,
+            'form_order': form.id if form else None,
+            'is_menu_media': is_menu_media,
+        }
+
 
 class HQMediaMixin(Document):
     """
