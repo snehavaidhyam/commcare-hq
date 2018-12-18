@@ -59,7 +59,7 @@ class HQMediaLicense(DocumentSchema):
         if properties and properties.get('type', '') == 'public':
             properties['type'] = 'cc'
         super(HQMediaLicense, self).__init__(_d, **properties)
-    
+
     @property
     def display_name(self):
         return LICENSES.get(self.type, "Improper License")
@@ -241,7 +241,7 @@ class CommCareMultimedia(BlobMixin, SafeSaveDocument):
     def get_base_mime_type(cls, data, filename=None):
         mime_type = cls.get_mime_type(data, filename=filename)
         return mime_type.split('/')[0] if mime_type else None
-        
+
     @classmethod
     def generate_hash(cls, data):
         return hashlib.md5(data).hexdigest()
@@ -400,7 +400,7 @@ class CommCareImage(CommCareMultimedia):
     def get_icon_class(cls):
         return "fa fa-picture-o"
 
-        
+
 class CommCareAudio(CommCareMultimedia):
 
     class Config(object):
@@ -538,6 +538,10 @@ def _log_media_deletion(app, deleted_media):
             'deleted_media': list(formatted_media),
         }, indent=4)
     )
+
+
+class HasMediaMixin(object):
+    pass
 
 
 class HQMediaMixin(Document):

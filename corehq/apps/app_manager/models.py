@@ -99,7 +99,7 @@ from corehq.util import bitly
 from corehq.util import view_utils
 from corehq.apps.appstore.models import SnapshotMixin
 from corehq.apps.builds.models import BuildSpec, BuildRecord
-from corehq.apps.hqmedia.models import HQMediaMixin, CommCareMultimedia
+from corehq.apps.hqmedia.models import HasMediaMixin, HQMediaMixin, CommCareMultimedia
 from corehq.apps.translations.models import TranslationMixin
 from corehq.apps.users.util import cc_user_domain
 from corehq.apps.domain.models import cached_property, Domain
@@ -929,7 +929,7 @@ class CaseReferences(DocumentSchema):
             yield CaseSaveReferenceWithPath.wrap(ref_copy)
 
 
-class FormBase(DocumentSchema):
+class FormBase(DocumentSchema, HasMediaMixin):
     """
     Part of a Managed Application; configuration for a form.
     Translates to a second-level menu on the phone
@@ -2489,7 +2489,7 @@ class CaseListForm(NavMenuItemMediaMixin):
         return self._module.get_app()
 
 
-class ModuleBase(IndexedSchema, NavMenuItemMediaMixin, CommentMixin):
+class ModuleBase(IndexedSchema, HasMediaMixin, NavMenuItemMediaMixin, CommentMixin):
     name = DictProperty(six.text_type)
     unique_id = StringProperty()
     case_type = StringProperty()
@@ -5620,7 +5620,7 @@ class SavedAppBuild(ApplicationBase):
         return data
 
 
-class Application(ApplicationBase, TranslationMixin, HQMediaMixin):
+class Application(ApplicationBase, TranslationMixin, HasMediaMixin, HQMediaMixin):
     """
     An Application that can be created entirely through the online interface
 
