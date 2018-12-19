@@ -1717,13 +1717,6 @@ class NavMenuItemMediaMixin(DocumentSchema, HasMediaMixin):
 
     def all_media(self):    # NavMenuItemMediaMixin
         media = []
-        module = None
-        form = None
-        if isinstance(self, ModuleBase):
-            module = self
-        elif isinstance(self, FormBase):
-            module = self.get_module()
-            form = self
         kwargs = self.get_media_ref_kwargs()
         media.extend([ApplicationMediaReference(image, media_class=CommCareImage, **kwargs)
                       for image in self.all_image_paths() if image])
