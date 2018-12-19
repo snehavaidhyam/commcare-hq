@@ -546,16 +546,8 @@ class HasMediaMixin(object):
         # Get all of the ApplicationMediaReference objects referenced in this application
         raise notImplementedError()
 
-    def get_media_ref_kwargs(self, lang, module, form=None, is_menu_media=False):
-        return {
-            'app_lang': lang,
-            'module_name': module.name,
-            'module_id': module.id,
-            'form_name': form.name if form else None,
-            'form_id': form.unique_id if form else None,
-            'form_order': form.id if form else None,
-            'is_menu_media': is_menu_media,
-        }
+    def get_media_ref_kwargs(self):
+        raise NotImplementedError()
 
 
 class HQMediaMixin(Document):
@@ -573,36 +565,38 @@ class HQMediaMixin(Document):
     archived_media = DictProperty()  # where we store references to the old logos (or other multimedia) on a downgrade, so that information is not lost
 
     def get_menu_media(self, module, module_index, form=None, form_index=None, to_language=None):
+        return {}   # TODO
         if not module:
             # user_registration isn't a real module, for instance
             return {}
-        media_kwargs = self.get_media_ref_kwargs(
-            module, module_index, form=form, form_index=form_index,
-            is_menu_media=True)
+        media_kwargs = self.get_media_ref_kwargs(self.default_language, module, form=form, is_menu_media=True)
         media_kwargs.update(to_language=to_language or self.default_language)
         item = form or module
         return self._get_item_media(item, media_kwargs)
 
     def get_case_list_form_media(self, module, module_index, to_language=None):
+        return {}   # TODO
         if not module:
             # user_registration isn't a real module, for instance
             return {}
-        media_kwargs = self.get_media_ref_kwargs(module, module_index)
+        media_kwargs = self.get_media_ref_kwargs(self.default_language, module)
         media_kwargs.update(to_language=to_language or self.default_language)
         return self._get_item_media(module.case_list_form, media_kwargs)
 
     def get_case_list_menu_item_media(self, module, module_index, to_language=None):
+        return {}   # TODO
         if not module or not module.uses_media() or not hasattr(module, 'case_list'):
             # user_registration isn't a real module, for instance
             return {}
-        media_kwargs = self.get_media_ref_kwargs(module, module_index)
+        media_kwargs = self.get_media_ref_kwargs(self.default_language, module)
         media_kwargs.update(to_language=to_language or self.default_language)
         return self._get_item_media(module.case_list, media_kwargs)
 
     def get_case_list_lookup_image(self, module, module_index, type='case'):
+        return {}   # TODO
         if not module:
             return {}
-        media_kwargs = self.get_media_ref_kwargs(module, module_index)
+        media_kwargs = self.get_media_ref_kwargs(self.default_language, module)
         details_name = '{}_details'.format(type)
         if not hasattr(module, details_name):
             return {}
@@ -645,18 +639,6 @@ class HQMediaMixin(Document):
     @memoized
     def get_all_paths_of_type(self, media_class_name):
         return set([m.path for m in self.all_media() if m.media_class.__name__ == media_class_name])
-
-    def get_media_ref_kwargs(self, module, module_index, form=None,
-                             form_index=None, is_menu_media=False):
-        return {
-            'app_lang': self.default_language,
-            'module_name': module.name,
-            'module_id': module_index,
-            'form_name': form.name if form else None,
-            'form_id': form.unique_id if form else None,
-            'form_order': form_index,
-            'is_menu_media': is_menu_media,
-        }
 
     @property
     @memoized

@@ -1353,10 +1353,21 @@ class FormBase(DocumentSchema, HasMediaMixin):
             updates_by_case_type[case_type].update(save_to_case_update.properties)
         return updates_by_case_type
 
-    def all_media(self):    # form
+    def get_media_ref_kwargs(self):     # form
         module = self.get_module()
-        media_kwargs = self.get_media_ref_kwargs(module.get_app().default_language, module, form=self)
-        media = []
+        return {
+            'app_lang': module.get_app().default_language,
+            'module_name': module.name,
+            'module_id': module.id,
+            'form_name': self.name,
+            'form_id': self.unique_id,
+            'form_order': self.id,
+            'is_menu_media': False,
+        }
+
+    def all_media(self):    # form
+        media = super(FormBase, self).all_media()   # get menu media
+        media_kwargs = self.get_media_ref_kwargs()
         try:
             parsed = self.wrapped_xform()
             if not parsed.exists():
@@ -1561,7 +1572,7 @@ class CustomIcon(DocumentSchema):
     xpath = StringProperty()
 
 
-class NavMenuItemMediaMixin(DocumentSchema):
+class NavMenuItemMediaMixin(DocumentSchema, HasMediaMixin):
     """
         Language-specific icon and audio.
         Properties are map of lang-code to filepath
@@ -1692,6 +1703,33 @@ class NavMenuItemMediaMixin(DocumentSchema):
             app.all_media_paths.reset_cache(app)
             if old_value not in app.all_media_paths():
                 app.multimedia_map.pop(old_value, None)
+
+    def get_media_ref_kwargs(self):     # NavMenuItemMediaMixin
+        return {
+            'app_lang': self._module.get_app().default_language,
+            'module_name': self._module.name,
+            'module_id': self._module.id,
+            'form_name': None,
+            'form_id': None,
+            'form_order': None,
+            'is_menu_media': True,
+        }
+
+    def all_media(self):    # NavMenuItemMediaMixin
+        media = []
+        module = None
+        form = None
+        if isinstance(self, ModuleBase):
+            module = self
+        elif isinstance(self, FormBase):
+            module = self.get_module()
+            form = self
+        kwargs = self.get_media_ref_kwargs()
+        media.extend([ApplicationMediaReference(image, media_class=CommCareImage, **kwargs)
+                      for image in self.all_image_paths() if image])
+        media.extend([ApplicationMediaReference(audio, media_class=CommCareAudio, **kwargs)
+                      for audio in self.all_audio_paths() if audio])
+        return media
 
     def rename_media(self, old_path, new_path):
         app = self.get_app()
@@ -2523,7 +2561,7 @@ class CaseListForm(NavMenuItemMediaMixin):
         return self._module.get_app()
 
 
-class ModuleBase(IndexedSchema, HasMediaMixin, NavMenuItemMediaMixin, CommentMixin):
+class ModuleBase(IndexedSchema, NavMenuItemMediaMixin, CommentMixin):
     name = DictProperty(six.text_type)
     unique_id = StringProperty()
     case_type = StringProperty()
@@ -2757,9 +2795,26 @@ class ModuleBase(IndexedSchema, HasMediaMixin, NavMenuItemMediaMixin, CommentMix
         """
         return True
 
+    def get_media_ref_kwargs(self):     # form
+        return {
+            'app_lang': self.get_app().default_language,
+            'module_name': self.name,
+            'module_id': self.id,
+            'form_name': None,
+            'form_id': None,
+            'form_order': None,
+            'is_menu_media': False,
+        }
+
     def all_media(self):    # module
-        media = []
-        media_kwargs = self.get_media_ref_kwargs(self.get_app().default_language, self)
+        media = super(ModuleBase, self).all_media()
+        media_kwargs = self.get_media_ref_kwargs()
+
+        if self.case_list_form.form_id:
+            media += self.case_list_form.all_media()
+
+        if hasattr(self, 'case_list') and self.case_list.show:
+            media += self.case_list.all_media()
 
         for name, details, display in self.get_details():
             # Case list lookup android callout
@@ -6352,10 +6407,6 @@ class Application(ApplicationBase, TranslationMixin, HasMediaMixin, HQMediaMixin
         return len(self.multimedia_map) > 0
 
     def all_media(self):    # application
-        """
-            Get all the paths of multimedia IMAGES and AUDIO referenced in this application.
-            (Video and anything else is currently not supported...)
-        """
         media = []
         #self.media_form_errors = False
 
@@ -6364,38 +6415,6 @@ class Application(ApplicationBase, TranslationMixin, HasMediaMixin, HQMediaMixin
             for index, form in enumerate(module.get_forms()):
                 media += form.all_media()
 
-        def _add_menu_media(item, **kwargs):
-            media.extend([ApplicationMediaReference(image,
-                                                    media_class=CommCareImage,
-                                                    is_menu_media=True, **kwargs)
-                          for image in item.all_image_paths()
-                          if image])
-
-            media.extend([ApplicationMediaReference(audio,
-                                                    media_class=CommCareAudio,
-                                                    is_menu_media=True, **kwargs)
-                          for audio in item.all_audio_paths()
-                          if audio])
-
-        for m, module in enumerate([m for m in self.get_modules() if m.uses_media()]):
-            media_kwargs = {
-                'module_name': module.name,
-                'module_id': m,
-                'app_lang': self.default_language,
-            }
-            _add_menu_media(module, **media_kwargs)
-
-            if module.case_list_form.form_id:
-                _add_menu_media(module.case_list_form, **media_kwargs)
-
-            if hasattr(module, 'case_list') and module.case_list.show:
-                _add_menu_media(module.case_list, **media_kwargs)
-
-            for f_order, f in enumerate(module.get_forms()):
-                media_kwargs['form_name'] = f.name
-                media_kwargs['form_id'] = f.unique_id
-                media_kwargs['form_order'] = f_order
-                _add_menu_media(f, **media_kwargs)
         return media
 
     @memoized
