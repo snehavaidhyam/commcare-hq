@@ -139,6 +139,18 @@
         "datatype": "string",
         "type": "raw",
         "property_name": "death_informed_authorities"
+      },
+      {
+        "column_id": "is_pregnant",
+        "datatype": "string",
+        "type": "raw",
+        "property_name": "is_pregnant"
+      },
+      {
+        "column_id": "migration_status",
+        "datatype": "string",
+        "type": "raw",
+        "property_name": "migration_status"
       }
     ],
     "named_expressions": {
