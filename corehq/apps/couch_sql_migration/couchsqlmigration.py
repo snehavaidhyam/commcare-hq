@@ -22,7 +22,9 @@ from casexml.apps.case.xml.parser import CaseNoopAction
 from corehq.apps.couch_sql_migration.diff import filter_form_diffs, filter_case_diffs, filter_ledger_diffs
 from corehq.apps.domain.dbaccessors import get_doc_count_in_domain_by_type
 from corehq.apps.domain.models import Domain
+from corehq.apps.locations.models import SQLLocation
 from corehq.apps.tzmigration.api import force_phone_timezones_should_be_processed
+from corehq.apps.users.models import CommCareUser
 from corehq.blobs import CODES, get_blob_db
 from corehq.blobs.models import BlobMeta
 from corehq.form_processor.backends.sql.dbaccessors import CaseAccessorSQL, doc_type_to_state, LedgerAccessorSQL
@@ -95,6 +97,7 @@ class CouchSqlDomainMigrator(object):
 
         self.errors_with_normal_doc_type = []
         self.forms_that_touch_cases_without_actions = set()
+        self._id_map = {}
 
     def log_debug(self, message):
         _logger.debug(message)
@@ -115,6 +118,9 @@ class CouchSqlDomainMigrator(object):
         else:
             self.log_info('migrating domain {} to {}'.format(self.src_domain, self.dst_domain))
         self.log_info('run timestamp is {}'.format(self.run_timestamp))
+
+        if self.src_domain != self.dst_domain:
+            self._build_id_map()
 
         self.processed_docs = 0
         with TimingContext("couch_sql_migration") as timing_context:
@@ -152,7 +158,9 @@ class CouchSqlDomainMigrator(object):
             if form.get('problem', None):
                 self.errors_with_normal_doc_type.append(change.id)
                 continue
-            wrapped_form = XFormInstance.wrap(form)
+            # TODO: Map IDs before we wrap it
+            dst_form = self._map_ids(form)
+            wrapped_form = XFormInstance.wrap(dst_form)
             form_received = wrapped_form.received_on
             assert last_received_on <= form_received
             last_received_on = form_received
@@ -202,6 +210,7 @@ class CouchSqlDomainMigrator(object):
         self._try_to_process_queues(pool)
 
     def _migrate_form_and_associated_models_async(self, wrapped_form):
+        # TODO: ...
         set_local_domain_sql_backend_override(self.src_domain)
         try:
             self._migrate_form_and_associated_models(wrapped_form)
@@ -213,26 +222,62 @@ class CouchSqlDomainMigrator(object):
             self.processed_docs += 1
             self._log_main_forms_processed_count(throttled=True)
 
-    def _migrate_form_and_associated_models(self, couch_form):
-        sql_form = _migrate_form(couch_form, self.dst_domain)
-        _migrate_form_attachments(sql_form, couch_form)
-        _migrate_form_operations(sql_form, couch_form)
+    def _migrate_form_and_associated_models(self, src_couch_form):
+        # src_*_form contains IDs that refer to source domain entities
+        # dst_*_form contains IDs that refer to destination domain entities
+        dst_couch_form = self._map_ids(src_couch_form)
+        dst_sql_form = _migrate_form(dst_couch_form, self.dst_domain)
+        _migrate_form_attachments(dst_sql_form, dst_couch_form)
+        _migrate_form_operations(dst_sql_form, dst_couch_form)
 
-        self._save_diffs(couch_form, sql_form)
+        self._save_diffs(dst_couch_form, dst_sql_form)
 
         case_stock_result = None
-        if sql_form.initial_processing_complete:
-            case_stock_result = _get_case_and_ledger_updates(self.domain, sql_form)
+        if dst_sql_form.initial_processing_complete:
+            case_stock_result = _get_case_and_ledger_updates(self.src_domain, dst_sql_form)
             if len(case_stock_result.case_models):
                 touch_updates = [
-                    update for update in get_case_updates(couch_form)
+                    update for update in get_case_updates(dst_couch_form)
                     if len(update.actions) == 1 and isinstance(update.actions[0], CaseNoopAction)
                 ]
                 if len(touch_updates):
                     # record these for later use when filtering case diffs. See ``_filter_forms_touch_case``
-                    self.forms_that_touch_cases_without_actions.add(couch_form.form_id)
+                    self.forms_that_touch_cases_without_actions.add(dst_couch_form.form_id)
 
-        _save_migrated_models(sql_form, case_stock_result)
+        _save_migrated_models(dst_sql_form, case_stock_result)
+
+    def _build_id_map(self):
+        """
+        Iterate locations, mobile workers, apps and app builds to map
+        IDs in the source domain to IDs in the destination domain.
+
+        These will be used to update forms as they are migrated.
+        """
+        self._id_map = {}
+        for location in SQLLocation.objects.filter(domain=self.dst_domain):
+            if 'orig_id' in location.metadata:
+                self._id_map[location.metadata['orig_id']] = location.location_id
+
+        for user in CommCareUser.by_domain(self.dst_domain):
+            if 'orig_id' in user.user_data:
+                self._id_map[user.user_data['orig_id']] = user.get_id
+
+        # for app in get_apps_in_domain(self.dst_domain):
+        #     # find corresponding app in self.src_domain
+        #     pass
+
+    def _map_ids(self, src_couch_form):
+        """
+        The destination domain will have new IDs for locations, mobile
+        workers, apps and app builds. Return the given form with the
+        source domains IDs mapped to the corresponding IDs in the
+        destination domain.
+        """
+        import ipdb; ipdb.set_trace()
+        # TODO: What does src_couch_form look like?
+
+        dst_couch_form = src_couch_form
+        return dst_couch_form
 
     def _save_diffs(self, couch_form, sql_form):
         from corehq.apps.tzmigration.timezonemigration import json_diff
@@ -503,6 +548,7 @@ def _migrate_form(couch_form, dst_domain):
     See form_processor.parsers.form._create_new_xform
     and SubmissionPost._set_submission_properties for what this should do.
     """
+    # TODO: ...
     interface = FormProcessorInterface(dst_domain)
 
     form_data = couch_form.form
