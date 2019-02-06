@@ -41,6 +41,7 @@ from corehq.apps.domain.views.accounting import (
 )
 from corehq.apps.hqwebapp.async_handler import AsyncHandlerMixin
 from corehq.apps.hqwebapp.decorators import (
+    use_select2,
     use_select2_v4,
     use_jquery_ui,
     use_multiselect,
@@ -281,7 +282,7 @@ class NewSubscriptionView(AccountingSectionView, AsyncHandlerMixin):
         Select2BillingInfoHandler,
     ]
 
-    @use_select2_v4
+    @use_select2
     @use_jquery_ui  # for datepicker
     def dispatch(self, request, *args, **kwargs):
         return super(NewSubscriptionView, self).dispatch(request, *args, **kwargs)
@@ -355,7 +356,7 @@ class EditSubscriptionView(AccountingSectionView, AsyncHandlerMixin):
         Select2BillingInfoHandler,
     ]
 
-    @use_select2_v4
+    @use_select2
     @use_jquery_ui  # for datepicker
     def dispatch(self, request, *args, **kwargs):
         return super(EditSubscriptionView, self).dispatch(request, *args, **kwargs)
@@ -554,6 +555,10 @@ class NewSoftwarePlanView(AccountingSectionView):
             'url': SoftwarePlanInterface.get_url(),
         }]
 
+    @use_select2
+    def dispatch(self, request, *args, **kwargs):
+        return super(NewSoftwarePlanView, self).dispatch(request, *args, **kwargs)
+
     def post(self, request, *args, **kwargs):
         if self.plan_info_form.is_valid():
             plan = self.plan_info_form.create_plan()
@@ -571,7 +576,7 @@ class EditSoftwarePlanView(AccountingSectionView, AsyncHandlerMixin):
         SoftwareProductRateAsyncHandler,
     ]
 
-    @use_select2_v4
+    @use_select2
     @use_multiselect
     def dispatch(self, request, *args, **kwargs):
         return super(EditSoftwarePlanView, self).dispatch(request, *args, **kwargs)
@@ -668,6 +673,10 @@ class ViewSoftwarePlanVersionView(AccountingSectionView):
     def page_url(self):
         return reverse(self.urlname, args=self.args)
 
+    @use_select2
+    def dispatch(self, request, *args, **kwargs):
+        return super(ViewSoftwarePlanVersionView, self).dispatch(request, *args, **kwargs)
+
 
 
 class TriggerInvoiceView(AccountingSectionView, AsyncHandlerMixin):
@@ -695,7 +704,7 @@ class TriggerInvoiceView(AccountingSectionView, AsyncHandlerMixin):
             'trigger_form': self.trigger_form,
         }
 
-    @use_select2_v4
+    @use_select2
     def dispatch(self, request, *args, **kwargs):
         return super(TriggerInvoiceView, self).dispatch(request, *args, **kwargs)
 
@@ -739,7 +748,7 @@ class TriggerCustomerInvoiceView(AccountingSectionView, AsyncHandlerMixin):
             'trigger_customer_form': self.trigger_customer_invoice_form,
         }
 
-    @use_select2_v4
+    @use_select2
     def dispatch(self, request, *args, **kwargs):
         return super(TriggerCustomerInvoiceView, self).dispatch(request, *args, **kwargs)
 
@@ -781,7 +790,7 @@ class TriggerBookkeeperEmailView(AccountingSectionView):
             'trigger_email_form': self.trigger_email_form,
         }
 
-    @use_select2_v4
+    @use_select2
     def dispatch(self, request, *args, **kwargs):
         return super(TriggerBookkeeperEmailView, self).dispatch(request, *args, **kwargs)
 
@@ -814,6 +823,10 @@ class TestRenewalEmailView(AccountingSectionView):
         return {
             'reminder_email_form': self.reminder_email_form,
         }
+
+    @use_select2
+    def dispatch(self, request, *args, **kwargs):
+        return super(TestRenewalEmailView, self).dispatch(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
         if self.reminder_email_form.is_valid():
@@ -860,6 +873,10 @@ class InvoiceSummaryViewBase(AccountingSectionView):
             'suppress_invoice_form': self.suppress_invoice_form,
             'hide_invoice_form': self.hide_invoice_form,
         }
+
+    @use_select2
+    def dispatch(self, request, *args, **kwargs):
+        return super(InvoiceSummaryViewBase, self).dispatch(request, *args, **kwargs)
 
     @property
     @memoized
@@ -1129,6 +1146,10 @@ class ManageAccountingAdminsView(AccountingSectionView, CRUDPaginatedViewMixin):
             'id': admin.id,
             'username': admin.username,
         }
+
+    @use_select2
+    def dispatch(self, request, *args, **kwargs):
+        return super(ManageAccountingAdminsView, self).dispatch(request, *args, **kwargs)
 
     def get_create_form(self, is_blank=False):
         if self.request.method == 'POST' and not is_blank:

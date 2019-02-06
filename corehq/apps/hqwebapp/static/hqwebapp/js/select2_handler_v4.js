@@ -74,19 +74,19 @@ hqDefine("hqwebapp/js/select2_handler_v4", [
                 minimumInputLength: 0,
                 allowClear: true,
                 multiple: self.multiple,
-                placeholder: self.placeholder || ' ',   // some placeholder required for allowClear
+                placeholder: self.placeholder,
                 width: '100%',
                 ajax: {
                     delay: 150,
                     url: '',
                     dataType: 'json',
                     type: 'post',
-                    data: function (params) {
+                    data: function (term) {
                         $('.select2-results__options').find('li:not(.loading-results)').remove();
-                        var data = self.getExtraData(params.term);
+                        var data = self.getExtraData(term);
                         data['handler'] = self.getHandlerSlug();
                         data['action'] = self.fieldName;
-                        data['searchString'] = params.term || '';
+                        data['searchString'] = term.term || '';
                         return data;
                     },
                     processResults: self.processResults,
@@ -108,7 +108,7 @@ hqDefine("hqwebapp/js/select2_handler_v4", [
                 createTag: self.createNewChoice,
                 templateResult: self.templateResult,
                 templateSelection: self.templateSelection,
-                escapeMarkup: function (m) { return m; },
+
             });
 
             var initial = self.getInitialData(fieldInput);
