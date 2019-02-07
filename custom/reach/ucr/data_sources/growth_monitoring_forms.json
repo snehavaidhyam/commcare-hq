@@ -186,6 +186,53 @@
             "property_path": ["form", "date_referral"]
           }
         }
+      },
+      {
+        "column_id": "zscore_grading_wfa",
+        "datatype": "string",
+        "type": "expression",
+        "expression": {
+          "type": "conditional",
+          "test": {
+            "type": "named",
+            "name": "is_delivery_form"
+          },
+          "expression_if_true": {
+            "type": "property_path",
+            "property_path": ["case_open_child_health_3", "case", "update", "zscore_grading_wfa"]
+          },
+          "expression_if_false": {
+            "type": "root_doc",
+            "expression": {
+              "type": "property_path",
+              "property_path": ["form", "zscore_grading_wfa"]
+            }
+          }
+        }
+      },
+      {
+        "column_id": "zscore_grading_hfa",
+        "datatype": "string",
+        "type": "expression",
+        "expression": {
+          "type": "root_doc",
+          "expression": {
+            "type": "property_path",
+            "property_path": ["form", "zscore_grading_hfa"]
+          }
+        }
+      },
+      {
+        "column_id": "string",
+        "datatype": "small_integer",
+        "type": "expression",
+        "expression": {
+          "type": "root_doc",
+          "expression": {
+            "type": "property_path",
+            "property_path": ["form", "zscore_grading_wfh"]
+          }
+        }
       }
     ],
     "named_expressions": {
